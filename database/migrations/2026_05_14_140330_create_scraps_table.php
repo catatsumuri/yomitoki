@@ -29,12 +29,16 @@ return new class extends Migration
             $table->timestamp('processed_at')->nullable();
             $table->json('extracted_data')->nullable();
             $table->json('meta')->nullable();
+            $table->vector('embedding', 1024)->nullable();
+            $table->string('embedding_model')->nullable();
+            $table->timestamp('embedding_generated_at')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'status']);
             $table->index(['parent_id', 'occurred_at']);
             $table->index(['source_type', 'occurred_at']);
             $table->index('source_reference');
+            $table->vectorIndex('embedding');
         });
     }
 

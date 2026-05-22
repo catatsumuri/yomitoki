@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'user_id',
@@ -27,6 +29,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'processed_at',
     'extracted_data',
     'meta',
+    'embedding',
+    'embedding_model',
+    'embedding_generated_at',
 ])]
 class Scrap extends Model
 {
@@ -57,6 +62,44 @@ class Scrap extends Model
         return $this->hasMany(self::class, 'parent_id')
             ->orderBy('occurred_at')
             ->orderBy('id');
+    }
+
+    /**
+     * Get parent scraps similar to this one using pgvector cosine distance.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function relatedScraps(int $limit = 5): Collection
+    {
+        if (! $this->embedding) {
+            return collect();
+        }
+
+        return DB::select(
+            <<<'SQL'
+            SELECT id, title, slug, summary, status, source_type, occurred_at,
+                   1 - (embedding <=> ?::vector) AS similarity
+            FROM scraps
+            WHERE user_id = ?
+              AND id != ?
+              AND parent_id IS NULL
+              AND status != 'archived'
+              AND embedding IS NOT NULL
+            ORDER BY embedding <=> ?::vector
+            LIMIT ?
+            SQL,
+            [$this->embedding, $this->user_id, $this->id, $this->embedding, $limit],
+        )
+            ->pipe(fn ($items) => collect($items)->map(fn (object $row) => [
+                'id' => $row->id,
+                'title' => $row->title,
+                'slug' => $row->slug,
+                'summary' => $row->summary,
+                'status' => $row->status,
+                'sourceType' => $row->source_type,
+                'occurredAt' => $row->occurred_at,
+                'similarity' => round((float) $row->similarity, 3),
+            ]));
     }
 
     /**

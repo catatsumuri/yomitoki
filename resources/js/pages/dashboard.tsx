@@ -54,11 +54,23 @@ type InboxItem = {
     }[];
 };
 
+type RelatedScrap = {
+    id: number;
+    title: string | null;
+    slug: string | null;
+    summary: string | null;
+    status: string;
+    sourceType: string;
+    occurredAt: string | null;
+    similarity: number;
+};
+
 type DashboardProps = {
     inboxItems: {
         data: InboxItem[];
     };
     selectedScrap: InboxItem | null;
+    relatedScraps: RelatedScrap[];
 };
 
 type SuggestedMetadata = {
@@ -164,7 +176,7 @@ function isSupportedBodyFile(file: File): boolean {
     ].some((extension) => lowerCaseName.endsWith(extension));
 }
 
-export default function Dashboard({ inboxItems, selectedScrap: initialSelectedScrap }: DashboardProps) {
+export default function Dashboard({ inboxItems, selectedScrap: initialSelectedScrap, relatedScraps }: DashboardProps) {
     const [selectedScrap, setSelectedScrap] = useState<InboxItem | null>(initialSelectedScrap);
     const [isEditingSelected, setIsEditingSelected] = useState(false);
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
@@ -951,6 +963,47 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                             </span>
                                                         </div>
                                                     </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {relatedScraps.length > 0 && (
+                                        <div className="space-y-3 border-t border-border/70 pt-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <h3 className="text-sm font-medium text-foreground">
+                                                        Related scraps
+                                                    </h3>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        Nearest by embedding similarity.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {relatedScraps.map((related) => (
+                                                    <Link
+                                                        key={related.id}
+                                                        href={related.slug ? dashboardShow(related.slug) : dashboard()}
+                                                        prefetch
+                                                        className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-medium text-foreground">
+                                                                    {related.title ?? 'Untitled scrap'}
+                                                                </p>
+                                                                {related.summary && (
+                                                                    <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                                                        {related.summary}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <span className="shrink-0 text-xs text-muted-foreground">
+                                                                {Math.round(related.similarity * 100)}%
+                                                            </span>
+                                                        </div>
+                                                    </Link>
                                                 ))}
                                             </div>
                                         </div>

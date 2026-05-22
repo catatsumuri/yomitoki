@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Scrap;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -35,13 +36,17 @@ class DashboardController extends Controller
                 ->orderBy('id')])
             ->firstOrFail();
 
-        return $this->renderDashboard($request->user(), $selectedScrap);
+        $relatedScraps = $selectedScrap->relatedScraps();
+
+        return $this->renderDashboard($request->user(), $selectedScrap, $relatedScraps);
     }
 
     /**
      * Render dashboard props for the current user.
+     *
+     * @param  Collection<int, array<string, mixed>>|null  $relatedScraps
      */
-    private function renderDashboard(User $user, ?Scrap $selectedScrap): Response
+    private function renderDashboard(User $user, ?Scrap $selectedScrap, ?Collection $relatedScraps = null): Response
     {
         $scrapQuery = DB::table('scraps')
             ->where('user_id', $user->id)
@@ -130,6 +135,7 @@ class DashboardController extends Controller
             ],
             'inboxItems' => $inboxItems,
             'selectedScrap' => $selectedScrap ? $this->mapScrapForDashboard($selectedScrap) : null,
+            'relatedScraps' => $relatedScraps?->values()->all() ?? [],
             'needsAttention' => $needsAttention,
             'recentDocuments' => $recentDocuments,
             'sourceOverview' => $sourceOverview,

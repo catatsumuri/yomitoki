@@ -7,6 +7,7 @@ use App\Http\Requests\StoreScrapRequest;
 use App\Http\Requests\SuggestScrapMetadataRequest;
 use App\Http\Requests\UpdateScrapRequest;
 use App\Http\Requests\UploadScrapImageRequest;
+use App\Jobs\GenerateScrapEmbeddingJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -114,6 +115,8 @@ class ScrapController extends Controller
             ],
         ]);
 
+        GenerateScrapEmbeddingJob::dispatch($scrap->id);
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $this->buildSuccessMessage(
@@ -163,6 +166,8 @@ class ScrapController extends Controller
                 'organize_requested' => (bool) $validated['organize'],
             ],
         ]);
+
+        GenerateScrapEmbeddingJob::dispatch($scrap->id);
 
         Inertia::flash('toast', [
             'type' => 'success',
