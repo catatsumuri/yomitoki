@@ -1,4 +1,11 @@
-import { Head, InfiniteScroll, Link, router, useForm, useHttp } from '@inertiajs/react';
+import {
+    Head,
+    InfiniteScroll,
+    Link,
+    router,
+    useForm,
+    useHttp,
+} from '@inertiajs/react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
     Archive,
@@ -105,7 +112,9 @@ function formatRelativeDate(value: string | null): string {
     return `${year}-${month}-${day} ${hour}:${minute} UTC`;
 }
 
-function toneForStatus(status: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+function toneForStatus(
+    status: string,
+): 'default' | 'secondary' | 'outline' | 'destructive' {
     if (status === 'failed') {
         return 'destructive';
     }
@@ -114,7 +123,11 @@ function toneForStatus(status: string): 'default' | 'secondary' | 'outline' | 'd
         return 'secondary';
     }
 
-    if (status === 'final' || status === 'completed' || status === 'processed') {
+    if (
+        status === 'final' ||
+        status === 'completed' ||
+        status === 'processed'
+    ) {
         return 'default';
     }
 
@@ -129,16 +142,22 @@ function buildFallbackTitle(content: string, currentTitle: string): string {
     }
 
     const trimmedContent = content.trim();
-    const assetMatch = trimmedContent.match(/^!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/u);
+    const assetMatch = trimmedContent.match(
+        /^!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/u,
+    );
 
     if (assetMatch) {
         const candidate = (assetMatch[1] || assetMatch[2] || '').trim();
 
         if (candidate !== '') {
-            const withoutQuery = candidate.split('?')[0]?.split('#')[0] ?? candidate;
+            const withoutQuery =
+                candidate.split('?')[0]?.split('#')[0] ?? candidate;
             const lastSegment = withoutQuery.split('/').pop() ?? withoutQuery;
             const withoutExtension = lastSegment.replace(/\.[^.]+$/u, '');
-            const cleaned = withoutExtension.replace(/[-_]+/gu, ' ').trim().replace(/\s+/g, ' ');
+            const cleaned = withoutExtension
+                .replace(/[-_]+/gu, ' ')
+                .trim()
+                .replace(/\s+/g, ' ');
 
             if (cleaned !== '') {
                 return cleaned.slice(0, 72);
@@ -167,27 +186,32 @@ function isSupportedBodyFile(file: File): boolean {
 
     const lowerCaseName = file.name.toLowerCase();
 
-    return [
-        '.pdf',
-        '.doc',
-        '.docx',
-        '.md',
-        '.txt',
-    ].some((extension) => lowerCaseName.endsWith(extension));
+    return ['.pdf', '.doc', '.docx', '.md', '.txt'].some((extension) =>
+        lowerCaseName.endsWith(extension),
+    );
 }
 
-export default function Dashboard({ inboxItems, selectedScrap: initialSelectedScrap, relatedScraps }: DashboardProps) {
-    const [selectedScrap, setSelectedScrap] = useState<InboxItem | null>(initialSelectedScrap);
+export default function Dashboard({
+    inboxItems,
+    selectedScrap: initialSelectedScrap,
+    relatedScraps,
+}: DashboardProps) {
+    const [selectedScrap, setSelectedScrap] = useState<InboxItem | null>(
+        initialSelectedScrap,
+    );
     const [isEditingSelected, setIsEditingSelected] = useState(false);
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
     const [showMainMetaFields, setShowMainMetaFields] = useState(false);
     const [showChildMetaFields, setShowChildMetaFields] = useState(false);
     const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
-    const [pendingOrganize, setPendingOrganize] = useState<boolean | null>(null);
-    const [suggestedMetadata, setSuggestedMetadata] = useState<SuggestedMetadata>({
-        title: '',
-        slug: '',
-    });
+    const [pendingOrganize, setPendingOrganize] = useState<boolean | null>(
+        null,
+    );
+    const [suggestedMetadata, setSuggestedMetadata] =
+        useState<SuggestedMetadata>({
+            title: '',
+            slug: '',
+        });
     const recentScraps = inboxItems.data;
 
     const form = useForm({
@@ -207,20 +231,27 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
     const mainTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const childTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const uploadInputRef = useRef<HTMLInputElement | null>(null);
-    const suggestionRequest = useHttp<{
-        title: string;
-        slug: string;
-        content: string;
-        parent_id: number | null;
-        scrap_id: number | null;
-    }, { title: string | null; slug: string | null }>(() => ({
+    const suggestionRequest = useHttp<
+        {
+            title: string;
+            slug: string;
+            content: string;
+            parent_id: number | null;
+            scrap_id: number | null;
+        },
+        { title: string | null; slug: string | null }
+    >(() => ({
         title: form.data.title,
         slug: form.data.slug,
         content: form.data.content,
-        parent_id: selectedScrap && !isEditingSelected ? selectedScrap.id : null,
+        parent_id:
+            selectedScrap && !isEditingSelected ? selectedScrap.id : null,
         scrap_id: selectedScrap && isEditingSelected ? selectedScrap.id : null,
     }));
 
+    // Inertia reuses this page component between visits, so the editor needs to
+    // resync its local UI state from the latest server payload after navigation.
+    /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
     useEffect(() => {
         setSelectedScrap(initialSelectedScrap);
         setIsEditingSelected(false);
@@ -237,10 +268,13 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
             return;
         }
 
-        const refreshedSelection = recentScraps.find((item) => item.id === selectedScrap.id);
+        const refreshedSelection = recentScraps.find(
+            (item) => item.id === selectedScrap.id,
+        );
 
         if (!refreshedSelection) {
             beginNewScrap();
+
             return;
         }
 
@@ -254,10 +288,12 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
             });
         }
     }, [recentScraps, selectedScrap, isEditingSelected]);
+    /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
     function beginNewScrap(): void {
         if (initialSelectedScrap !== null) {
             router.visit(dashboard());
+
             return;
         }
 
@@ -290,7 +326,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
 
         setIsEditingSelected(true);
         setEditorMode('write');
-        setShowMainMetaFields(Boolean(selectedScrap.title || selectedScrap.slug));
+        setShowMainMetaFields(
+            Boolean(selectedScrap.title || selectedScrap.slug),
+        );
         form.setData({
             title: selectedScrap.title ?? '',
             slug: selectedScrap.slug ?? '',
@@ -302,6 +340,7 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
     function cancelEditSelectedScrap(): void {
         if (!selectedScrap) {
             beginNewScrap();
+
             return;
         }
 
@@ -430,7 +469,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
         }
     }
 
-    function handleBodyPaste(event: React.ClipboardEvent<HTMLTextAreaElement>): void {
+    function handleBodyPaste(
+        event: React.ClipboardEvent<HTMLTextAreaElement>,
+    ): void {
         const imageItem = Array.from(event.clipboardData.items).find((item) =>
             item.type.startsWith('image/'),
         );
@@ -452,7 +493,8 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
         organize: boolean,
         overrides?: Partial<typeof form.data>,
     ): void {
-        const isEditingExistingScrap = isEditingSelected && selectedScrap !== null;
+        const isEditingExistingScrap =
+            isEditingSelected && selectedScrap !== null;
         const parentScrap = !isEditingSelected ? selectedScrap : null;
         const nextData = {
             ...form.data,
@@ -462,7 +504,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
         form.transform(() => ({
             ...nextData,
             organize,
-            parent_id: isEditingExistingScrap ? null : (parentScrap?.id ?? null),
+            parent_id: isEditingExistingScrap
+                ? null
+                : (parentScrap?.id ?? null),
         }));
 
         form.submit(
@@ -470,44 +514,51 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                 ? ScrapController.update(selectedScrap.id)
                 : ScrapController.store(),
             {
-            preserveScroll: true,
-            onSuccess: () => {
-                if (!isEditingExistingScrap) {
-                    if (parentScrap) {
-                        setEditorMode('write');
-                        setShowChildMetaFields(false);
-                        setIsSuggestionDialogOpen(false);
-                        setPendingOrganize(null);
-                        form.resetAndClearErrors();
+                preserveScroll: true,
+                onSuccess: () => {
+                    if (!isEditingExistingScrap) {
+                        if (parentScrap) {
+                            setEditorMode('write');
+                            setShowChildMetaFields(false);
+                            setIsSuggestionDialogOpen(false);
+                            setPendingOrganize(null);
+                            form.resetAndClearErrors();
+
+                            return;
+                        }
+
+                        beginNewScrap();
+
                         return;
                     }
 
-                    beginNewScrap();
-                    return;
-                }
-
-                setIsEditingSelected(false);
-                setEditorMode('write');
-                setIsSuggestionDialogOpen(false);
-                setPendingOrganize(null);
-                form.clearErrors();
+                    setIsEditingSelected(false);
+                    setEditorMode('write');
+                    setIsSuggestionDialogOpen(false);
+                    setPendingOrganize(null);
+                    form.clearErrors();
+                },
             },
-        });
+        );
     }
 
-    const canEditSlug = selectedScrap === null || selectedScrap.parentId === null;
-    const shouldSuggestSlugForCurrentSave = selectedScrap === null
-        ? true
-        : isEditingSelected
-        ? selectedScrap.parentId === null
-        : false;
+    const canEditSlug =
+        selectedScrap === null || selectedScrap.parentId === null;
+    const shouldSuggestSlugForCurrentSave =
+        selectedScrap === null
+            ? true
+            : isEditingSelected
+              ? selectedScrap.parentId === null
+              : false;
 
     async function handleSave(organize: boolean): Promise<void> {
         const missingTitle = form.data.title.trim() === '';
-        const missingSlug = shouldSuggestSlugForCurrentSave && form.data.slug.trim() === '';
+        const missingSlug =
+            shouldSuggestSlugForCurrentSave && form.data.slug.trim() === '';
 
         if (!missingTitle && !missingSlug) {
             persistScrap(organize);
+
             return;
         }
 
@@ -579,14 +630,20 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                     <DialogHeader>
                         <DialogTitle>AI metadata suggestion</DialogTitle>
                         <DialogDescription>
-                            Title and slug were incomplete, so the AI prepared a polished title
-                            {shouldSuggestSlugForCurrentSave ? ' and a unique slug' : ''} before save.
+                            Title and slug were incomplete, so the AI prepared a
+                            polished title
+                            {shouldSuggestSlugForCurrentSave
+                                ? ' and a unique slug'
+                                : ''}{' '}
+                            before save.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="suggested-title">Suggested title</Label>
+                            <Label htmlFor="suggested-title">
+                                Suggested title
+                            </Label>
                             <Input
                                 id="suggested-title"
                                 value={suggestedMetadata.title}
@@ -601,7 +658,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
 
                         {shouldSuggestSlugForCurrentSave && (
                             <div className="space-y-2">
-                                <Label htmlFor="suggested-slug">Suggested slug</Label>
+                                <Label htmlFor="suggested-slug">
+                                    Suggested slug
+                                </Label>
                                 <Input
                                     id="suggested-slug"
                                     value={suggestedMetadata.slug}
@@ -675,7 +734,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                             <div className="flex rounded-xl border border-border/70 bg-background p-1">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setEditorMode('write')}
+                                                    onClick={() =>
+                                                        setEditorMode('write')
+                                                    }
                                                     className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
                                                         editorMode === 'write'
                                                             ? 'bg-foreground text-background'
@@ -686,7 +747,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setEditorMode('preview')}
+                                                    onClick={() =>
+                                                        setEditorMode('preview')
+                                                    }
                                                     className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
                                                         editorMode === 'preview'
                                                             ? 'bg-foreground text-background'
@@ -700,7 +763,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                disabled={editorMode !== 'write'}
+                                                disabled={
+                                                    editorMode !== 'write'
+                                                }
                                                 onClick={openUploadDialog}
                                             >
                                                 <ImageUp className="size-4" />
@@ -725,12 +790,17 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                 <div className="space-y-6">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant={toneForStatus(selectedScrap.status)}>
+                                            <Badge
+                                                variant={toneForStatus(
+                                                    selectedScrap.status,
+                                                )}
+                                            >
                                                 {selectedScrap.status}
                                             </Badge>
                                             <Badge variant="outline">
-                                                {sourceLabels[selectedScrap.sourceType] ??
-                                                    selectedScrap.sourceType}
+                                                {sourceLabels[
+                                                    selectedScrap.sourceType
+                                                ] ?? selectedScrap.sourceType}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">
                                                 {formatRelativeDate(
@@ -741,13 +811,17 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Button
                                                 variant="outline"
-                                                disabled={archiveForm.processing}
+                                                disabled={
+                                                    archiveForm.processing
+                                                }
                                                 onClick={archiveSelectedScrap}
                                             >
                                                 <Archive className="size-4" />
                                                 Send to archive
                                             </Button>
-                                            <Button onClick={beginEditSelectedScrap}>
+                                            <Button
+                                                onClick={beginEditSelectedScrap}
+                                            >
                                                 <PencilLine className="size-4" />
                                                 Edit this scrap
                                             </Button>
@@ -782,30 +856,41 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 Add child scrap
                                             </h3>
                                             <p className="mt-1 text-sm text-muted-foreground">
-                                                Continue this thought directly under the current article.
+                                                Continue this thought directly
+                                                under the current article.
                                             </p>
                                         </div>
 
                                         <div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
                                             <div className="flex items-center justify-between gap-3">
                                                 <Badge variant="outline">
-                                                    Under {selectedScrap.title ?? 'Untitled scrap'}
+                                                    Under{' '}
+                                                    {selectedScrap.title ??
+                                                        'Untitled scrap'}
                                                 </Badge>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={editorMode !== 'write'}
-                                                            onClick={openUploadDialog}
-                                                        >
-                                                            <ImageUp className="size-4" />
-                                                            Upload file
-                                                        </Button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                            setShowChildMetaFields((current) => !current)
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={
+                                                            editorMode !==
+                                                            'write'
+                                                        }
+                                                        onClick={
+                                                            openUploadDialog
+                                                        }
+                                                    >
+                                                        <ImageUp className="size-4" />
+                                                        Upload file
+                                                    </Button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowChildMetaFields(
+                                                                (current) =>
+                                                                    !current,
+                                                            )
                                                         }
                                                         className="text-muted-foreground transition-colors hover:text-foreground"
                                                         aria-label={
@@ -828,9 +913,14 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                     <div className="flex rounded-xl border border-border/70 bg-background p-1">
                                                         <button
                                                             type="button"
-                                                            onClick={() => setEditorMode('write')}
+                                                            onClick={() =>
+                                                                setEditorMode(
+                                                                    'write',
+                                                                )
+                                                            }
                                                             className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                                                                editorMode === 'write'
+                                                                editorMode ===
+                                                                'write'
                                                                     ? 'bg-foreground text-background'
                                                                     : 'text-muted-foreground'
                                                             }`}
@@ -839,9 +929,14 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setEditorMode('preview')}
+                                                            onClick={() =>
+                                                                setEditorMode(
+                                                                    'preview',
+                                                                )
+                                                            }
                                                             className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                                                                editorMode === 'preview'
+                                                                editorMode ===
+                                                                'preview'
                                                                     ? 'bg-foreground text-background'
                                                                     : 'text-muted-foreground'
                                                             }`}
@@ -861,50 +956,80 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                         id="child-scrap-title"
                                                         value={form.data.title}
                                                         onChange={(event) =>
-                                                            form.setData('title', event.target.value)
+                                                            form.setData(
+                                                                'title',
+                                                                event.target
+                                                                    .value,
+                                                            )
                                                         }
                                                         placeholder="Leave blank if the body says enough."
                                                     />
-                                                    <InputError message={form.errors.title} />
+                                                    <InputError
+                                                        message={
+                                                            form.errors.title
+                                                        }
+                                                    />
                                                 </div>
                                             )}
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="child-scrap-body">Body</Label>
+                                                <Label htmlFor="child-scrap-body">
+                                                    Body
+                                                </Label>
                                                 {editorMode === 'write' ? (
                                                     <textarea
                                                         ref={childTextareaRef}
                                                         id="child-scrap-body"
-                                                        value={form.data.content}
+                                                        value={
+                                                            form.data.content
+                                                        }
                                                         onChange={(event) =>
-                                                            form.setData('content', event.target.value)
+                                                            form.setData(
+                                                                'content',
+                                                                event.target
+                                                                    .value,
+                                                            )
                                                         }
                                                         onDrop={handleBodyDrop}
-                                                        onDragOver={(event) => event.preventDefault()}
-                                                        onPaste={handleBodyPaste}
+                                                        onDragOver={(event) =>
+                                                            event.preventDefault()
+                                                        }
+                                                        onPaste={
+                                                            handleBodyPaste
+                                                        }
                                                         placeholder="Write in Markdown if it helps. # heading, - bullets, > quote, `code`, [link](https://...) ..."
-                                                        className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive min-h-48 w-full rounded-2xl border bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                                                        className="min-h-48 w-full rounded-2xl border border-input bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                                                     />
                                                 ) : (
-                                                    <div className="border-input min-h-48 rounded-2xl border bg-background/60 px-4 py-4">
+                                                    <div className="min-h-48 rounded-2xl border border-input bg-background/60 px-4 py-4">
                                                         {form.data.content.trim() ? (
                                                             <MarkdownPreview
-                                                                content={form.data.content}
+                                                                content={
+                                                                    form.data
+                                                                        .content
+                                                                }
                                                             />
                                                         ) : (
                                                             <p className="text-sm text-muted-foreground">
-                                                                Nothing to preview yet.
+                                                                Nothing to
+                                                                preview yet.
                                                             </p>
                                                         )}
                                                     </div>
                                                 )}
-                                                <InputError message={form.errors.content} />
+                                                <InputError
+                                                    message={
+                                                        form.errors.content
+                                                    }
+                                                />
                                             </div>
 
                                             <div className="flex flex-wrap gap-2">
                                                 <Button
                                                     disabled={form.processing}
-                                                    onClick={() => handleSave(false)}
+                                                    onClick={() =>
+                                                        handleSave(false)
+                                                    }
                                                 >
                                                     <CornerDownLeft className="size-4" />
                                                     Save child scrap
@@ -912,7 +1037,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 <Button
                                                     variant="outline"
                                                     disabled={form.processing}
-                                                    onClick={() => handleSave(true)}
+                                                    onClick={() =>
+                                                        handleSave(true)
+                                                    }
                                                 >
                                                     <Sparkles className="size-4" />
                                                     Save and organize
@@ -927,7 +1054,8 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 </h3>
                                             </div>
                                             <span className="text-xs text-muted-foreground">
-                                                {selectedScrap.children.length} linked
+                                                {selectedScrap.children.length}{' '}
+                                                linked
                                             </span>
                                         </div>
                                     </div>
@@ -935,35 +1063,51 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                     {selectedScrap.children.length > 0 && (
                                         <div className="space-y-3">
                                             <div className="space-y-3">
-                                                {selectedScrap.children.map((child) => (
-                                                    <div
-                                                        key={child.id}
-                                                        className="rounded-2xl border border-border/70 bg-background/60 p-4"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div>
-                                                                <p className="font-medium text-foreground">
-                                                                    {child.title ?? 'Untitled scrap'}
-                                                                </p>
-                                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                                    {child.summary ?? 'No summary yet.'}
-                                                                </p>
+                                                {selectedScrap.children.map(
+                                                    (child) => (
+                                                        <div
+                                                            key={child.id}
+                                                            className="rounded-2xl border border-border/70 bg-background/60 p-4"
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div>
+                                                                    <p className="font-medium text-foreground">
+                                                                        {child.title ??
+                                                                            'Untitled scrap'}
+                                                                    </p>
+                                                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                                        {child.summary ??
+                                                                            'No summary yet.'}
+                                                                    </p>
+                                                                </div>
+                                                                <Badge
+                                                                    variant={toneForStatus(
+                                                                        child.status,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        child.status
+                                                                    }
+                                                                </Badge>
                                                             </div>
-                                                            <Badge variant={toneForStatus(child.status)}>
-                                                                {child.status}
-                                                            </Badge>
+                                                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                                <span>
+                                                                    {sourceLabels[
+                                                                        child
+                                                                            .sourceType
+                                                                    ] ??
+                                                                        child.sourceType}
+                                                                </span>
+                                                                <span>•</span>
+                                                                <span>
+                                                                    {formatRelativeDate(
+                                                                        child.occurredAt,
+                                                                    )}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                            <span>
-                                                                {sourceLabels[child.sourceType] ?? child.sourceType}
-                                                            </span>
-                                                            <span>•</span>
-                                                            <span>
-                                                                {formatRelativeDate(child.occurredAt)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    ),
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -976,42 +1120,60 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                         Related scraps
                                                     </h3>
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        Nearest by embedding similarity.
+                                                        Nearest by embedding
+                                                        similarity.
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
-                                                {relatedScraps.map((related) => (
-                                                    <Link
-                                                        key={related.id}
-                                                        href={related.slug ? dashboardShow(related.slug) : dashboard()}
-                                                        prefetch
-                                                        className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="min-w-0">
-                                                                <p className="truncate text-sm font-medium text-foreground">
-                                                                    {related.title ?? 'Untitled scrap'}
-                                                                </p>
-                                                                {related.summary && (
-                                                                    <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                                                        {related.summary}
+                                                {relatedScraps.map(
+                                                    (related) => (
+                                                        <Link
+                                                            key={related.id}
+                                                            href={
+                                                                related.slug
+                                                                    ? dashboardShow(
+                                                                          related.slug,
+                                                                      )
+                                                                    : dashboard()
+                                                            }
+                                                            prefetch
+                                                            className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="min-w-0">
+                                                                    <p className="truncate text-sm font-medium text-foreground">
+                                                                        {related.title ??
+                                                                            'Untitled scrap'}
                                                                     </p>
-                                                                )}
+                                                                    {related.summary && (
+                                                                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                                                            {
+                                                                                related.summary
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <span className="shrink-0 text-xs text-muted-foreground">
+                                                                    {Math.round(
+                                                                        related.similarity *
+                                                                            100,
+                                                                    )}
+                                                                    %
+                                                                </span>
                                                             </div>
-                                                            <span className="shrink-0 text-xs text-muted-foreground">
-                                                                {Math.round(related.similarity * 100)}%
-                                                            </span>
-                                                        </div>
-                                                    </Link>
-                                                ))}
+                                                        </Link>
+                                                    ),
+                                                )}
                                             </div>
                                         </div>
                                     )}
 
                                     <div className="border-t border-border/70 pt-4">
                                         <p className="text-sm leading-6 text-muted-foreground">
-                                            Review it here first. If the capture needs cleanup or more detail, switch into edit mode from the header.
+                                            Review it here first. If the capture
+                                            needs cleanup or more detail, switch
+                                            into edit mode from the header.
                                         </p>
                                     </div>
                                 </div>
@@ -1021,12 +1183,17 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                 <>
                                     {selectedScrap && (
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant={toneForStatus(selectedScrap.status)}>
+                                            <Badge
+                                                variant={toneForStatus(
+                                                    selectedScrap.status,
+                                                )}
+                                            >
                                                 {selectedScrap.status}
                                             </Badge>
                                             <Badge variant="outline">
-                                                {sourceLabels[selectedScrap.sourceType] ??
-                                                    selectedScrap.sourceType}
+                                                {sourceLabels[
+                                                    selectedScrap.sourceType
+                                                ] ?? selectedScrap.sourceType}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">
                                                 {formatRelativeDate(
@@ -1051,7 +1218,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    setShowMainMetaFields((current) => !current)
+                                                    setShowMainMetaFields(
+                                                        (current) => !current,
+                                                    )
                                                 }
                                                 className="text-muted-foreground transition-colors hover:text-foreground"
                                                 aria-label={
@@ -1082,11 +1251,19 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                         id="scrap-title"
                                                         value={form.data.title}
                                                         onChange={(event) =>
-                                                            form.setData('title', event.target.value)
+                                                            form.setData(
+                                                                'title',
+                                                                event.target
+                                                                    .value,
+                                                            )
                                                         }
                                                         placeholder="Leave blank if the body says enough."
                                                     />
-                                                    <InputError message={form.errors.title} />
+                                                    <InputError
+                                                        message={
+                                                            form.errors.title
+                                                        }
+                                                    />
                                                 </div>
 
                                                 {canEditSlug && (
@@ -1096,13 +1273,23 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                         </Label>
                                                         <Input
                                                             id="scrap-slug"
-                                                            value={form.data.slug}
+                                                            value={
+                                                                form.data.slug
+                                                            }
                                                             onChange={(event) =>
-                                                                form.setData('slug', event.target.value)
+                                                                form.setData(
+                                                                    'slug',
+                                                                    event.target
+                                                                        .value,
+                                                                )
                                                             }
                                                             placeholder="dashboard-direction"
                                                         />
-                                                        <InputError message={form.errors.slug} />
+                                                        <InputError
+                                                            message={
+                                                                form.errors.slug
+                                                            }
+                                                        />
                                                     </div>
                                                 )}
                                             </div>
@@ -1123,16 +1310,20 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                     )
                                                 }
                                                 onDrop={handleBodyDrop}
-                                                onDragOver={(event) => event.preventDefault()}
+                                                onDragOver={(event) =>
+                                                    event.preventDefault()
+                                                }
                                                 onPaste={handleBodyPaste}
                                                 placeholder="Write in Markdown if it helps. # heading, - bullets, > quote, `code`, [link](https://...) ..."
-                                                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive min-h-72 w-full rounded-2xl border bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                                                className="min-h-72 w-full rounded-2xl border border-input bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                                             />
                                         ) : (
-                                            <div className="border-input min-h-72 rounded-2xl border bg-background/60 px-4 py-4">
+                                            <div className="min-h-72 rounded-2xl border border-input bg-background/60 px-4 py-4">
                                                 {form.data.content.trim() ? (
                                                     <MarkdownPreview
-                                                        content={form.data.content}
+                                                        content={
+                                                            form.data.content
+                                                        }
                                                     />
                                                 ) : (
                                                     <p className="text-sm text-muted-foreground">
@@ -1141,39 +1332,57 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 )}
                                             </div>
                                         )}
-                                        <InputError message={form.errors.content} />
+                                        <InputError
+                                            message={form.errors.content}
+                                        />
                                     </div>
 
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex flex-wrap gap-2">
-                                            {selectedScrap && isEditingSelected && (
-                                                <>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="lg"
-                                                        className="min-w-32"
-                                                        disabled={form.processing || archiveForm.processing}
-                                                        onClick={cancelEditSelectedScrap}
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="lg"
-                                                        className="min-w-40"
-                                                        disabled={form.processing || archiveForm.processing}
-                                                        onClick={archiveSelectedScrap}
-                                                    >
-                                                        <Archive className="size-4" />
-                                                        Send to archive
-                                                    </Button>
-                                                </>
-                                            )}
+                                            {selectedScrap &&
+                                                isEditingSelected && (
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="lg"
+                                                            className="min-w-32"
+                                                            disabled={
+                                                                form.processing ||
+                                                                archiveForm.processing
+                                                            }
+                                                            onClick={
+                                                                cancelEditSelectedScrap
+                                                            }
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="lg"
+                                                            className="min-w-40"
+                                                            disabled={
+                                                                form.processing ||
+                                                                archiveForm.processing
+                                                            }
+                                                            onClick={
+                                                                archiveSelectedScrap
+                                                            }
+                                                        >
+                                                            <Archive className="size-4" />
+                                                            Send to archive
+                                                        </Button>
+                                                    </>
+                                                )}
                                             <Button
                                                 size="lg"
                                                 className="min-w-36"
-                                                disabled={form.processing || archiveForm.processing}
-                                                onClick={() => handleSave(false)}
+                                                disabled={
+                                                    form.processing ||
+                                                    archiveForm.processing
+                                                }
+                                                onClick={() =>
+                                                    handleSave(false)
+                                                }
                                             >
                                                 <CornerDownLeft className="size-4" />
                                                 {selectedScrap
@@ -1184,7 +1393,10 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 variant="outline"
                                                 size="lg"
                                                 className="min-w-40"
-                                                disabled={form.processing || archiveForm.processing}
+                                                disabled={
+                                                    form.processing ||
+                                                    archiveForm.processing
+                                                }
                                                 onClick={() => handleSave(true)}
                                             >
                                                 <Sparkles className="size-4" />
@@ -1194,10 +1406,11 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                             </Button>
                                         </div>
                                         <p className="text-xs leading-5 text-muted-foreground">
-                                            Type, tags, priority, and summary can be
-                                            inferred later through structured
-                                            output. Paste images or drop and upload
-                                            files to insert Markdown automatically.
+                                            Type, tags, priority, and summary
+                                            can be inferred later through
+                                            structured output. Paste images or
+                                            drop and upload files to insert
+                                            Markdown automatically.
                                         </p>
                                     </div>
                                 </>
@@ -1227,7 +1440,9 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                     disabled={loading}
                                                     onClick={fetch}
                                                 >
-                                                    {loading ? 'Loading...' : 'Load more'}
+                                                    {loading
+                                                        ? 'Loading...'
+                                                        : 'Load more'}
                                                 </Button>
                                             </div>
                                         ) : null
@@ -1237,7 +1452,13 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                         {recentScraps.map((item) => (
                                             <Link
                                                 key={item.id}
-                                                href={item.slug ? dashboardShow(item.slug) : dashboard()}
+                                                href={
+                                                    item.slug
+                                                        ? dashboardShow(
+                                                              item.slug,
+                                                          )
+                                                        : dashboard()
+                                                }
                                                 prefetch
                                                 onClick={() => {
                                                     if (!item.slug) {
@@ -1245,7 +1466,8 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                     }
                                                 }}
                                                 className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
-                                                    selectedScrap?.id === item.id
+                                                    selectedScrap?.id ===
+                                                    item.id
                                                         ? 'border-foreground/40 ring-2 ring-foreground/10'
                                                         : 'border-border/70'
                                                 }`}
@@ -1253,25 +1475,33 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
                                                         <p className="font-medium text-foreground">
-                                                            {item.title ?? 'Untitled scrap'}
+                                                            {item.title ??
+                                                                'Untitled scrap'}
                                                         </p>
                                                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
                                                             {item.summary ??
                                                                 'No summary yet. This is still raw capture.'}
                                                         </p>
                                                     </div>
-                                                    <Badge variant={toneForStatus(item.status)}>
+                                                    <Badge
+                                                        variant={toneForStatus(
+                                                            item.status,
+                                                        )}
+                                                    >
                                                         {item.status}
                                                     </Badge>
                                                 </div>
                                                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                                                     <span>
-                                                        {sourceLabels[item.sourceType] ??
-                                                            item.sourceType}
+                                                        {sourceLabels[
+                                                            item.sourceType
+                                                        ] ?? item.sourceType}
                                                     </span>
                                                     <span>•</span>
                                                     <span>
-                                                        {formatRelativeDate(item.occurredAt)}
+                                                        {formatRelativeDate(
+                                                            item.occurredAt,
+                                                        )}
                                                     </span>
                                                 </div>
                                             </Link>
@@ -1280,7 +1510,6 @@ export default function Dashboard({ inboxItems, selectedScrap: initialSelectedSc
                                 </InfiniteScroll>
                             </CardContent>
                         </Card>
-
                     </div>
                 </div>
             </div>
@@ -1312,7 +1541,10 @@ function MarkdownPreview({ content }: { content: string }) {
         }
 
         nodes.push(
-            <ul key={`list-${nodes.length}`} className="list-disc space-y-1 pl-5">
+            <ul
+                key={`list-${nodes.length}`}
+                className="list-disc space-y-1 pl-5"
+            >
                 {listItems.map((item, index) => (
                     <li key={index}>{renderInlineMarkdown(item)}</li>
                 ))}
@@ -1347,7 +1579,10 @@ function MarkdownPreview({ content }: { content: string }) {
         }
 
         nodes.push(
-            <ol key={`ordered-list-${nodes.length}`} className="list-decimal space-y-1 pl-5">
+            <ol
+                key={`ordered-list-${nodes.length}`}
+                className="list-decimal space-y-1 pl-5"
+            >
                 {orderedListItems.map((item, index) => (
                     <li key={index}>{renderInlineMarkdown(item)}</li>
                 ))}
@@ -1433,7 +1668,10 @@ function MarkdownPreview({ content }: { content: string }) {
 
         if (line.startsWith('### ')) {
             nodes.push(
-                <h3 key={`h3-${nodes.length}`} className="text-lg font-semibold">
+                <h3
+                    key={`h3-${nodes.length}`}
+                    className="text-lg font-semibold"
+                >
                     {renderInlineMarkdown(line.slice(4))}
                 </h3>,
             );
@@ -1442,7 +1680,10 @@ function MarkdownPreview({ content }: { content: string }) {
 
         if (line.startsWith('## ')) {
             nodes.push(
-                <h2 key={`h2-${nodes.length}`} className="text-xl font-semibold">
+                <h2
+                    key={`h2-${nodes.length}`}
+                    className="text-xl font-semibold"
+                >
                     {renderInlineMarkdown(line.slice(3))}
                 </h2>,
             );
@@ -1451,7 +1692,10 @@ function MarkdownPreview({ content }: { content: string }) {
 
         if (line.startsWith('# ')) {
             nodes.push(
-                <h1 key={`h1-${nodes.length}`} className="text-2xl font-semibold">
+                <h1
+                    key={`h1-${nodes.length}`}
+                    className="text-2xl font-semibold"
+                >
                     {renderInlineMarkdown(line.slice(2))}
                 </h1>,
             );

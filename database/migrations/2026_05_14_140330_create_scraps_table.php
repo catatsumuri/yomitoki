@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,7 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('scraps', function (Blueprint $table) {
+        $supportsPgVector = DB::getDriverName() === 'pgsql';
+
+        Schema::create('scraps', function (Blueprint $table) use ($supportsPgVector) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('scraps')->nullOnDelete();
@@ -29,7 +32,11 @@ return new class extends Migration
             $table->timestamp('processed_at')->nullable();
             $table->json('extracted_data')->nullable();
             $table->json('meta')->nullable();
-            $table->vector('embedding', 1024)->nullable();
+            if ($supportsPgVector) {
+                $table->vector('embedding', 1024)->nullable();
+            } else {
+                $table->longText('embedding')->nullable();
+            }
             $table->string('embedding_model')->nullable();
             $table->timestamp('embedding_generated_at')->nullable();
             $table->timestamps();
@@ -38,7 +45,9 @@ return new class extends Migration
             $table->index(['parent_id', 'occurred_at']);
             $table->index(['source_type', 'occurred_at']);
             $table->index('source_reference');
-            $table->vectorIndex('embedding');
+            if ($supportsPgVector) {
+                $table->vectorIndex('embedding');
+            }
         });
     }
 

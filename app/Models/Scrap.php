@@ -71,7 +71,7 @@ class Scrap extends Model
      */
     public function relatedScraps(int $limit = 5): Collection
     {
-        if (! $this->embedding) {
+        if (! $this->embedding || DB::getDriverName() !== 'pgsql') {
             return collect();
         }
 
