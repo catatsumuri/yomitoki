@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('scraps', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('scraps')->nullOnDelete();
             $table->foreignId('scrap_source_id')->nullable()->constrained()->nullOnDelete();
             $table->string('source_type');
             $table->string('source_reference')->nullable();
             $table->string('title')->nullable();
+            $table->string('slug')->nullable()->unique();
             $table->longText('content');
             $table->longText('content_markdown')->nullable();
             $table->text('summary')->nullable();
@@ -30,6 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['user_id', 'status']);
+            $table->index(['parent_id', 'occurred_at']);
             $table->index(['source_type', 'occurred_at']);
             $table->index('source_reference');
         });
