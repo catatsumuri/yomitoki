@@ -6,7 +6,6 @@ import {
     useForm,
     useHttp,
 } from '@inertiajs/react';
-import { Fragment, useEffect, useRef, useState } from 'react';
 import {
     Archive,
     CircleMinus,
@@ -16,9 +15,11 @@ import {
     PencilLine,
     Sparkles,
 } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
-import { Button } from '@/components/ui/button';
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -36,7 +37,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import InputError from '@/components/input-error';
 import { dashboard } from '@/routes';
 import { show as dashboardShow } from '@/routes/dashboard';
 

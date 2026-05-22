@@ -3,7 +3,13 @@ import { Archive, CornerDownLeft, RotateCcw, Trash2 } from 'lucide-react';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogClose,
@@ -86,7 +92,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                 <section className="rounded-2xl border border-sidebar-border/70 bg-muted/40 px-4 py-3 dark:border-sidebar-border dark:bg-muted/20">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <p className="text-sm font-medium text-muted-foreground">Archives</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                Archives
+                            </p>
                             <h1 className="text-xl font-semibold tracking-tight">
                                 Review what has already been set aside
                             </h1>
@@ -105,7 +113,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                     <CardHeader>
                         <CardTitle>Archived scraps</CardTitle>
                         <CardDescription>
-                            These scraps are no longer in the active capture flow. Top-level and nested scraps are listed together.
+                            These scraps are no longer in the active capture
+                            flow. Top-level and nested scraps are listed
+                            together.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -137,35 +147,56 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-medium text-foreground">
-                                                        {item.title ?? 'Untitled scrap'}
+                                                        {item.title ??
+                                                            'Untitled scrap'}
                                                     </p>
-                                                    <Badge variant="outline">archived</Badge>
+                                                    <Badge variant="outline">
+                                                        archived
+                                                    </Badge>
                                                     {item.isNested ? (
-                                                        <Badge variant="secondary">nested</Badge>
+                                                        <Badge variant="secondary">
+                                                            nested
+                                                        </Badge>
                                                     ) : (
-                                                        <Badge variant="secondary">top-level</Badge>
+                                                        <Badge variant="secondary">
+                                                            top-level
+                                                        </Badge>
                                                     )}
                                                 </div>
                                                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                                    {item.summary ?? excerpt(item.content)}
+                                                    {item.summary ??
+                                                        excerpt(item.content)}
                                                 </p>
                                             </div>
                                             <Archive className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                                         </div>
 
                                         <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                            <span>{sourceLabels[item.sourceType] ?? item.sourceType}</span>
+                                            <span>
+                                                {sourceLabels[
+                                                    item.sourceType
+                                                ] ?? item.sourceType}
+                                            </span>
                                             <span>•</span>
-                                            <span>Captured {formatUtcDate(item.occurredAt)}</span>
+                                            <span>
+                                                Captured{' '}
+                                                {formatUtcDate(item.occurredAt)}
+                                            </span>
                                             <span>•</span>
-                                            <span>Archived {formatUtcDate(item.archivedAt)}</span>
+                                            <span>
+                                                Archived{' '}
+                                                {formatUtcDate(item.archivedAt)}
+                                            </span>
                                         </div>
 
                                         {item.parent ? (
                                             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1.5 text-xs text-muted-foreground">
                                                 <CornerDownLeft className="size-3.5" />
                                                 <span>
-                                                    Child of {item.parent.title ?? item.parent.slug ?? 'untitled parent'}
+                                                    Child of{' '}
+                                                    {item.parent.title ??
+                                                        item.parent.slug ??
+                                                        'untitled parent'}
                                                 </span>
                                             </div>
                                         ) : null}
@@ -174,10 +205,14 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                             <Button
                                                 type="button"
                                                 variant="secondary"
-                                                disabled={restoreForm.processing}
+                                                disabled={
+                                                    restoreForm.processing
+                                                }
                                                 onClick={() =>
                                                     restoreForm.submit(
-                                                        ScrapController.restore(item.id),
+                                                        ScrapController.restore(
+                                                            item.id,
+                                                        ),
                                                         {
                                                             preserveScroll: true,
                                                         },
@@ -200,16 +235,24 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                 </DialogTrigger>
                                                 <DialogContent>
                                                     <DialogTitle>
-                                                        Permanently delete this scrap?
+                                                        Permanently delete this
+                                                        scrap?
                                                     </DialogTitle>
                                                     <DialogDescription>
-                                                        This action cannot be undone. The selected archived scrap
-                                                        {item.isNested ? '' : ' and any archived child scraps'}
-                                                        {' '}will be removed permanently.
+                                                        This action cannot be
+                                                        undone. The selected
+                                                        archived scrap
+                                                        {item.isNested
+                                                            ? ''
+                                                            : ' and any archived child scraps'}{' '}
+                                                        will be removed
+                                                        permanently.
                                                     </DialogDescription>
 
                                                     <Form
-                                                        {...ScrapController.destroy.form(item.id)}
+                                                        {...ScrapController.destroy.form(
+                                                            item.id,
+                                                        )}
                                                         options={{
                                                             preserveScroll: true,
                                                         }}
@@ -217,7 +260,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                     >
                                                         {({ processing }) => (
                                                             <DialogFooter className="gap-2">
-                                                                <DialogClose asChild>
+                                                                <DialogClose
+                                                                    asChild
+                                                                >
                                                                     <Button variant="secondary">
                                                                         Cancel
                                                                     </Button>
@@ -225,11 +270,14 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
 
                                                                 <Button
                                                                     variant="destructive"
-                                                                    disabled={processing}
+                                                                    disabled={
+                                                                        processing
+                                                                    }
                                                                     asChild
                                                                 >
                                                                     <button type="submit">
-                                                                        Delete permanently
+                                                                        Delete
+                                                                        permanently
                                                                     </button>
                                                                 </Button>
                                                             </DialogFooter>
