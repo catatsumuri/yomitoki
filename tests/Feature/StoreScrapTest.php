@@ -1,10 +1,16 @@
 <?php
 
+use App\Jobs\GenerateScrapEmbeddingJob;
 use App\Models\Scrap;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Queue::fake();
+});
 
 test('authenticated users can store scraps', function () {
     $user = User::factory()->create();
@@ -29,6 +35,7 @@ test('authenticated users can store scraps', function () {
     expect($scrap->slug)->toBe('rough-dashboard-thought');
     expect($scrap->content)->toContain('writing box first');
     expect($scrap->meta)->toBe(['organize_requested' => true]);
+    Queue::assertPushed(GenerateScrapEmbeddingJob::class, fn (GenerateScrapEmbeddingJob $job) => $job->scrapId === $scrap->id);
 
     $response->assertRedirect(route('dashboard.show', ['slug' => 'rough-dashboard-thought']));
     $response->assertInertiaFlash('toast.message', 'Scrap saved. AI organization can be applied next.');
@@ -131,6 +138,7 @@ test('authenticated users can update their scraps', function () {
     expect($scrap->content)->toBe('# Updated content');
     expect($scrap->content_markdown)->toBe('# Updated content');
     expect($scrap->meta)->toBe(['organize_requested' => true]);
+    Queue::assertPushed(GenerateScrapEmbeddingJob::class, fn (GenerateScrapEmbeddingJob $job) => $job->scrapId === $scrap->id);
 
     $response->assertRedirect(route('dashboard.show', ['slug' => 'updated-title']));
     $response->assertInertiaFlash('toast.message', 'Scrap updated. AI organization can be applied next.');
