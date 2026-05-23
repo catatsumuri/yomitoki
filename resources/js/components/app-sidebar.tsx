@@ -1,3 +1,4 @@
+import { useLang } from '@erag/lang-sync-inertia/react';
 import { Link } from '@inertiajs/react';
 import { Archive, LayoutGrid } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -15,20 +16,22 @@ import {
 import { archives, dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Archives',
-        href: archives(),
-        icon: Archive,
-    },
-];
-
 export function AppSidebar() {
+    const { __ } = useLang();
+
+    const mainNavItems: NavItem[] = [
+        {
+            title: __('Dashboard'),
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        {
+            title: __('Archives'),
+            href: archives(),
+            icon: Archive,
+        },
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

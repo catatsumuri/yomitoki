@@ -75,7 +75,7 @@ class Scrap extends Model
             return collect();
         }
 
-        return DB::select(
+        return collect(DB::select(
             <<<'SQL'
             SELECT id, title, slug, summary, status, source_type, occurred_at,
                    1 - (embedding <=> ?::vector) AS similarity
@@ -89,17 +89,16 @@ class Scrap extends Model
             LIMIT ?
             SQL,
             [$this->embedding, $this->user_id, $this->id, $this->embedding, $limit],
-        )
-            ->pipe(fn ($items) => collect($items)->map(fn (object $row) => [
-                'id' => $row->id,
-                'title' => $row->title,
-                'slug' => $row->slug,
-                'summary' => $row->summary,
-                'status' => $row->status,
-                'sourceType' => $row->source_type,
-                'occurredAt' => $row->occurred_at,
-                'similarity' => round((float) $row->similarity, 3),
-            ]));
+        ))->map(fn (object $row) => [
+            'id' => $row->id,
+            'title' => $row->title,
+            'slug' => $row->slug,
+            'summary' => $row->summary,
+            'status' => $row->status,
+            'sourceType' => $row->source_type,
+            'occurredAt' => $row->occurred_at,
+            'similarity' => round((float) $row->similarity, 3),
+        ]);
     }
 
     /**

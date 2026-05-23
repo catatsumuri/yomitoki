@@ -1,4 +1,11 @@
-import { Form, Head, InfiniteScroll, useForm } from '@inertiajs/react';
+import { useLang } from '@erag/lang-sync-inertia/react';
+import {
+    Form,
+    Head,
+    InfiniteScroll,
+    setLayoutProps,
+    useForm,
+} from '@inertiajs/react';
 import { Archive, CornerDownLeft, RotateCcw, Trash2 } from 'lucide-react';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import { Badge } from '@/components/ui/badge';
@@ -49,73 +56,99 @@ type ArchivesProps = {
     };
 };
 
-const sourceLabels: Record<string, string> = {
-    daily_report: 'Daily report',
-    inquiry: 'Inquiry',
-    meeting_note: 'Meeting note',
-    note: 'Note',
-    research: 'Research',
-};
-
-function formatUtcDate(value: string | null): string {
-    if (!value) {
-        return 'No timestamp';
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return 'Invalid timestamp';
-    }
-
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hour = String(date.getUTCHours()).padStart(2, '0');
-    const minute = String(date.getUTCMinutes()).padStart(2, '0');
-
-    return `${year}-${month}-${day} ${hour}:${minute} UTC`;
-}
-
 function excerpt(content: string): string {
     return content.trim().replace(/\s+/g, ' ').slice(0, 180);
 }
 
 export default function Archives({ summary, archivedItems }: ArchivesProps) {
     const restoreForm = useForm({});
+    const { __ } = useLang();
+
+    const sourceLabels: Record<string, string> = {
+        daily_report: __('Daily report'),
+        inquiry: __('Inquiry'),
+        meeting_note: __('Meeting note'),
+        note: __('Note'),
+        research: __('Research'),
+    };
+
+    const formatUtcDate = (value: string | null): string => {
+        if (!value) {
+            return __('No timestamp');
+        }
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return __('Invalid timestamp');
+        }
+
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const hour = String(date.getUTCHours()).padStart(2, '0');
+        const minute = String(date.getUTCMinutes()).padStart(2, '0');
+
+        return `${year}-${month}-${day} ${hour}:${minute} UTC`;
+    };
+
+    setLayoutProps({
+        breadcrumbs: [
+            {
+                title: __('Dashboard'),
+                href: dashboard(),
+            },
+            {
+                title: __('Archives'),
+                href: archives(),
+            },
+        ],
+    });
 
     return (
         <>
-            <Head title="Archives" />
+            <Head title={__('Archives')} />
 
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-6">
                 <section className="rounded-2xl border border-sidebar-border/70 bg-muted/40 px-4 py-3 dark:border-sidebar-border dark:bg-muted/20">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">
-                                Archives
+                                {__('Archives')}
                             </p>
                             <h1 className="text-xl font-semibold tracking-tight">
-                                Review what has already been set aside
+                                {__('Review what has already been set aside')}
                             </h1>
                         </div>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                            <span>{summary.archivedCount} archived</span>
+                            <span>
+                                {__(':count archived', {
+                                    count: summary.archivedCount,
+                                })}
+                            </span>
                             <span>•</span>
-                            <span>{summary.topLevelCount} top-level</span>
+                            <span>
+                                {__(':count top-level', {
+                                    count: summary.topLevelCount,
+                                })}
+                            </span>
                             <span>•</span>
-                            <span>{summary.nestedCount} nested</span>
+                            <span>
+                                {__(':count nested', {
+                                    count: summary.nestedCount,
+                                })}
+                            </span>
                         </div>
                     </div>
                 </section>
 
                 <Card className="border-sidebar-border/70 shadow-sm">
                     <CardHeader>
-                        <CardTitle>Archived scraps</CardTitle>
+                        <CardTitle>{__('Archived scraps')}</CardTitle>
                         <CardDescription>
-                            These scraps are no longer in the active capture
-                            flow. Top-level and nested scraps are listed
-                            together.
+                            {__(
+                                'These scraps are no longer in the active capture flow. Top-level and nested scraps are listed together.',
+                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -131,7 +164,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                             disabled={loading}
                                             className="rounded-xl border border-border/70 px-4 py-2 text-sm font-medium transition-colors hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            {loading ? 'Loading…' : 'Load more'}
+                                            {loading
+                                                ? __('Loading…')
+                                                : __('Load more')}
                                         </button>
                                     </div>
                                 ) : null
@@ -148,18 +183,20 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-medium text-foreground">
                                                         {item.title ??
-                                                            'Untitled scrap'}
+                                                            __(
+                                                                'Untitled scrap',
+                                                            )}
                                                     </p>
                                                     <Badge variant="outline">
-                                                        archived
+                                                        {__('Archived')}
                                                     </Badge>
                                                     {item.isNested ? (
                                                         <Badge variant="secondary">
-                                                            nested
+                                                            {__('Nested')}
                                                         </Badge>
                                                     ) : (
                                                         <Badge variant="secondary">
-                                                            top-level
+                                                            {__('Top-level')}
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -179,13 +216,19 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                             </span>
                                             <span>•</span>
                                             <span>
-                                                Captured{' '}
-                                                {formatUtcDate(item.occurredAt)}
+                                                {__('Captured :date', {
+                                                    date: formatUtcDate(
+                                                        item.occurredAt,
+                                                    ),
+                                                })}
                                             </span>
                                             <span>•</span>
                                             <span>
-                                                Archived{' '}
-                                                {formatUtcDate(item.archivedAt)}
+                                                {__('Archived :date', {
+                                                    date: formatUtcDate(
+                                                        item.archivedAt,
+                                                    ),
+                                                })}
                                             </span>
                                         </div>
 
@@ -193,10 +236,14 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1.5 text-xs text-muted-foreground">
                                                 <CornerDownLeft className="size-3.5" />
                                                 <span>
-                                                    Child of{' '}
-                                                    {item.parent.title ??
-                                                        item.parent.slug ??
-                                                        'untitled parent'}
+                                                    {__('Child of :name', {
+                                                        name:
+                                                            item.parent.title ??
+                                                            item.parent.slug ??
+                                                            __(
+                                                                'Untitled parent',
+                                                            ),
+                                                    })}
                                                 </span>
                                             </div>
                                         ) : null}
@@ -220,7 +267,7 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                 }
                                             >
                                                 <RotateCcw className="size-4" />
-                                                Restore
+                                                {__('Restore')}
                                             </Button>
 
                                             <Dialog>
@@ -230,23 +277,25 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                         variant="destructive"
                                                     >
                                                         <Trash2 className="size-4" />
-                                                        Delete permanently
+                                                        {__(
+                                                            'Delete permanently',
+                                                        )}
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent>
                                                     <DialogTitle>
-                                                        Permanently delete this
-                                                        scrap?
+                                                        {__(
+                                                            'Permanently delete this scrap?',
+                                                        )}
                                                     </DialogTitle>
                                                     <DialogDescription>
-                                                        This action cannot be
-                                                        undone. The selected
-                                                        archived scrap
                                                         {item.isNested
-                                                            ? ''
-                                                            : ' and any archived child scraps'}{' '}
-                                                        will be removed
-                                                        permanently.
+                                                            ? __(
+                                                                  'This action cannot be undone. The selected archived scrap will be removed permanently.',
+                                                              )
+                                                            : __(
+                                                                  'This action cannot be undone. The selected archived scrap and any archived child scraps will be removed permanently.',
+                                                              )}
                                                     </DialogDescription>
 
                                                     <Form
@@ -264,7 +313,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                                     asChild
                                                                 >
                                                                     <Button variant="secondary">
-                                                                        Cancel
+                                                                        {__(
+                                                                            'Cancel',
+                                                                        )}
                                                                     </Button>
                                                                 </DialogClose>
 
@@ -276,8 +327,9 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
                                                                     asChild
                                                                 >
                                                                     <button type="submit">
-                                                                        Delete
-                                                                        permanently
+                                                                        {__(
+                                                                            'Delete permanently',
+                                                                        )}
                                                                     </button>
                                                                 </Button>
                                                             </DialogFooter>
@@ -296,16 +348,3 @@ export default function Archives({ summary, archivedItems }: ArchivesProps) {
         </>
     );
 }
-
-Archives.layout = {
-    breadcrumbs: [
-        {
-            title: 'Dashboard',
-            href: dashboard(),
-        },
-        {
-            title: 'Archives',
-            href: archives(),
-        },
-    ],
-};

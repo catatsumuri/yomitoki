@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ArchivesController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\ScrapController;
@@ -17,6 +18,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('scraps/{scrap}/restore', [ScrapController::class, 'restore'])->name('scraps.restore');
     Route::delete('scraps/{scrap}', [ScrapController::class, 'destroy'])->name('scraps.destroy');
     Route::get('archives', [ArchivesController::class, 'index'])->name('archives');
+    Route::get('backup/download', [BackupController::class, 'download'])->name('backup.download');
+    Route::post('scraps/{scrap}/backup', [BackupController::class, 'backupScrap'])->name('scraps.backup');
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/{slug}', [DashboardController::class, 'show'])->name('dashboard.show');
 });

@@ -24,11 +24,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->ensureStorageDirectories();
     }
 
     /**
      * Configure default behaviors for production-ready applications.
      */
+    protected function ensureStorageDirectories(): void
+    {
+        $dir = storage_path('app/private/backups');
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+    }
+
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);

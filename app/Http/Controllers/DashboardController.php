@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,16 +38,41 @@ class DashboardController extends Controller
             ->firstOrFail();
 
         $relatedScraps = $selectedScrap->relatedScraps();
+        $latestBackup = $this->findLatestBackup($request->user()->id, $selectedScrap->slug ?? (string) $selectedScrap->id);
 
-        return $this->renderDashboard($request->user(), $selectedScrap, $relatedScraps);
+        return $this->renderDashboard($request->user(), $selectedScrap, $relatedScraps, $latestBackup);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findLatestBackup(int $userId, string $scrapKey): ?array
+    {
+        $files = Storage::files("backups/{$userId}");
+
+        $metaFiles = array_filter(
+            $files,
+            fn (string $f) => str_starts_with(basename($f), $scrapKey.'-') && str_ends_with($f, '.meta.json'),
+        );
+
+        if (empty($metaFiles)) {
+            return null;
+        }
+
+        rsort($metaFiles);
+
+        $content = Storage::get($metaFiles[0]);
+
+        return $content ? json_decode($content, true) : null;
     }
 
     /**
      * Render dashboard props for the current user.
      *
      * @param  Collection<int, array<string, mixed>>|null  $relatedScraps
+     * @param  array<string, mixed>|null  $latestBackup
      */
-    private function renderDashboard(User $user, ?Scrap $selectedScrap, ?Collection $relatedScraps = null): Response
+    private function renderDashboard(User $user, ?Scrap $selectedScrap, ?Collection $relatedScraps = null, ?array $latestBackup = null): Response
     {
         $scrapQuery = DB::table('scraps')
             ->where('user_id', $user->id)
@@ -134,7 +160,9 @@ class DashboardController extends Controller
                 'runningAiCount' => (clone $aiRunQuery)->whereIn('status', ['queued', 'running'])->count(),
             ],
             'inboxItems' => $inboxItems,
-            'selectedScrap' => $selectedScrap ? $this->mapScrapForDashboard($selectedScrap) : null,
+            'selectedScrap' => $selectedScrap
+                ? array_merge($this->mapScrapForDashboard($selectedScrap), ['latestBackup' => $latestBackup])
+                : null,
             'relatedScraps' => $relatedScraps?->values()->all() ?? [],
             'needsAttention' => $needsAttention,
             'recentDocuments' => $recentDocuments,

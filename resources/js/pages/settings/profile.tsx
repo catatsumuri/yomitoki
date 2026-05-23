@@ -1,4 +1,5 @@
-import { Form, Head, usePage } from '@inertiajs/react';
+import { useLang } from '@erag/lang-sync-inertia/react';
+import { Form, Head, setLayoutProps, usePage } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
@@ -10,18 +11,28 @@ import { edit } from '@/routes/profile';
 
 export default function Profile() {
     const { auth } = usePage().props;
+    const { __ } = useLang();
+
+    setLayoutProps({
+        breadcrumbs: [
+            {
+                title: __('Profile settings'),
+                href: edit(),
+            },
+        ],
+    });
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title={__('Profile settings')} />
 
-            <h1 className="sr-only">Profile settings</h1>
+            <h1 className="sr-only">{__('Profile settings')}</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profile information"
-                    description="Update your name and email address"
+                    title={__('Profile information')}
+                    description={__('Update your name and email address')}
                 />
 
                 <Form
@@ -34,7 +45,7 @@ export default function Profile() {
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">{__('Name')}</Label>
 
                                 <Input
                                     id="name"
@@ -43,7 +54,7 @@ export default function Profile() {
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Full name"
+                                    placeholder={__('Full name')}
                                 />
 
                                 <InputError
@@ -53,7 +64,9 @@ export default function Profile() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">
+                                    {__('Email address')}
+                                </Label>
 
                                 <Input
                                     id="email"
@@ -63,7 +76,7 @@ export default function Profile() {
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="Email address"
+                                    placeholder={__('Email address')}
                                 />
 
                                 <InputError
@@ -77,7 +90,7 @@ export default function Profile() {
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Save
+                                    {__('Save')}
                                 </Button>
                             </div>
                         </>
@@ -89,12 +102,3 @@ export default function Profile() {
         </>
     );
 }
-
-Profile.layout = {
-    breadcrumbs: [
-        {
-            title: 'Profile settings',
-            href: edit(),
-        },
-    ],
-};

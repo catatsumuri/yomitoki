@@ -1,21 +1,26 @@
+import { useLang } from '@erag/lang-sync-inertia/react';
 import {
     Head,
     InfiniteScroll,
     Link,
     router,
+    setLayoutProps,
     useForm,
     useHttp,
 } from '@inertiajs/react';
 import {
     Archive,
+    ChevronDown,
     CircleMinus,
     CirclePlus,
     CornerDownLeft,
-    ImageUp,
+    Download,
     PencilLine,
     Sparkles,
+    Undo2,
 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
+import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -29,14 +34,22 @@ import {
 } from '@/components/ui/card';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { dashboard } from '@/routes';
 import { show as dashboardShow } from '@/routes/dashboard';
 
@@ -50,6 +63,11 @@ type InboxItem = {
     status: string;
     summary: string | null;
     occurredAt: string | null;
+    latestBackup: {
+        createdAt: string;
+        description: string | null;
+        scrapSlug: string;
+    } | null;
     children: {
         id: number;
         parentId: number | null;
@@ -84,33 +102,6 @@ type SuggestedMetadata = {
     title: string;
     slug: string;
 };
-
-const sourceLabels: Record<string, string> = {
-    daily_report: 'Daily report',
-    inquiry: 'Inquiry',
-    meeting_note: 'Meeting note',
-    research: 'Research',
-};
-
-function formatRelativeDate(value: string | null): string {
-    if (!value) {
-        return 'No timestamp';
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return 'Invalid timestamp';
-    }
-
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hour = String(date.getUTCHours()).padStart(2, '0');
-    const minute = String(date.getUTCMinutes()).padStart(2, '0');
-
-    return `${year}-${month}-${day} ${hour}:${minute} UTC`;
-}
 
 function toneForStatus(
     status: string,
@@ -196,6 +187,7 @@ export default function Dashboard({
     selectedScrap: initialSelectedScrap,
     relatedScraps,
 }: DashboardProps) {
+    const { __ } = useLang();
     const [selectedScrap, setSelectedScrap] = useState<InboxItem | null>(
         initialSelectedScrap,
     );
@@ -204,6 +196,13 @@ export default function Dashboard({
     const [showMainMetaFields, setShowMainMetaFields] = useState(false);
     const [showChildMetaFields, setShowChildMetaFields] = useState(false);
     const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
+    const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
+    const [backupDescription, setBackupDescription] = useState('');
+    const [isRecentScrapsOpen, setIsRecentScrapsOpen] = useState(true);
+    const [rightPanelTab, setRightPanelTab] = useState<'recent' | 'similar'>(
+        'recent',
+    );
+    const [showMobileRecent, setShowMobileRecent] = useState(false);
     const [pendingOrganize, setPendingOrganize] = useState<boolean | null>(
         null,
     );
@@ -213,6 +212,31 @@ export default function Dashboard({
             slug: '',
         });
     const recentScraps = inboxItems.data;
+
+    const sourceLabels: Record<string, string> = {
+        daily_report: __('Daily report'),
+        inquiry: __('Inquiry'),
+        meeting_note: __('Meeting note'),
+        research: __('Research'),
+    };
+
+    const statusLabels: Record<string, string> = {
+        raw: __('Raw'),
+        queued: __('Queued'),
+        final: __('Final'),
+        completed: __('Completed'),
+        processed: __('Processed'),
+        failed: __('Failed'),
+    };
+
+    setLayoutProps({
+        breadcrumbs: [
+            {
+                title: __('Dashboard'),
+                href: dashboard(),
+            },
+        ],
+    });
 
     const form = useForm({
         title: '',
@@ -230,7 +254,6 @@ export default function Dashboard({
     } | null>(null);
     const mainTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const childTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const uploadInputRef = useRef<HTMLInputElement | null>(null);
     const suggestionRequest = useHttp<
         {
             title: string;
@@ -260,6 +283,7 @@ export default function Dashboard({
         setShowChildMetaFields(false);
         setIsSuggestionDialogOpen(false);
         setPendingOrganize(null);
+        setRightPanelTab(relatedScraps.length > 0 ? 'similar' : 'recent');
         form.resetAndClearErrors();
     }, [initialSelectedScrap]);
 
@@ -278,7 +302,10 @@ export default function Dashboard({
             return;
         }
 
-        setSelectedScrap(refreshedSelection);
+        setSelectedScrap((prev) => ({
+            ...refreshedSelection,
+            latestBackup: prev?.latestBackup ?? null,
+        }));
 
         if (isEditingSelected) {
             form.setData({
@@ -287,7 +314,7 @@ export default function Dashboard({
                 content: refreshedSelection.content,
             });
         }
-    }, [recentScraps, selectedScrap, isEditingSelected]);
+    }, [recentScraps, selectedScrap?.id, isEditingSelected]);
     /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
     function beginNewScrap(): void {
@@ -447,14 +474,10 @@ export default function Dashboard({
                 },
                 onError: (errors) => {
                     pendingUploadRef.current = null;
-                    alert(errors.image ?? 'File upload failed.');
+                    alert(errors.image ?? __('File upload failed.'));
                 },
             },
         );
-    }
-
-    function openUploadDialog(): void {
-        uploadInputRef.current?.click();
     }
 
     function handleBodyDrop(event: React.DragEvent<HTMLTextAreaElement>): void {
@@ -613,7 +636,7 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Dashboard" />
+            <Head title={__('Dashboard')} />
             <Dialog
                 open={isSuggestionDialogOpen}
                 onOpenChange={(open) => {
@@ -628,21 +651,24 @@ export default function Dashboard({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>AI metadata suggestion</DialogTitle>
+                        <DialogTitle>
+                            {__('AI metadata suggestion')}
+                        </DialogTitle>
                         <DialogDescription>
-                            Title and slug were incomplete, so the AI prepared a
-                            polished title
                             {shouldSuggestSlugForCurrentSave
-                                ? ' and a unique slug'
-                                : ''}{' '}
-                            before save.
+                                ? __(
+                                      'Title and slug were incomplete, so the AI prepared a polished title and a unique slug before save.',
+                                  )
+                                : __(
+                                      'Title and slug were incomplete, so the AI prepared a polished title before save.',
+                                  )}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="suggested-title">
-                                Suggested title
+                                {__('Suggested title')}
                             </Label>
                             <Input
                                 id="suggested-title"
@@ -659,7 +685,7 @@ export default function Dashboard({
                         {shouldSuggestSlugForCurrentSave && (
                             <div className="space-y-2">
                                 <Label htmlFor="suggested-slug">
-                                    Suggested slug
+                                    {__('Suggested slug')}
                                 </Label>
                                 <Input
                                     id="suggested-slug"
@@ -683,32 +709,181 @@ export default function Dashboard({
                                 setPendingOrganize(null);
                             }}
                         >
-                            Cancel
+                            {__('Cancel')}
                         </Button>
                         <Button onClick={applySuggestionsAndSave}>
-                            Save with these values
+                            {__('Save with these values')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog
+                open={isBackupDialogOpen}
+                onOpenChange={setIsBackupDialogOpen}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{__('Create backup')}</DialogTitle>
+                        <DialogDescription>
+                            {__(
+                                'Optionally add a description. It will be saved inside the zip.',
+                            )}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2">
+                        <Label htmlFor="backup-description">
+                            {__('Description')}
+                            <span className="ml-1 text-xs text-muted-foreground">
+                                ({__('optional')})
+                            </span>
+                        </Label>
+                        <textarea
+                            id="backup-description"
+                            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            placeholder={__('e.g. Before refactoring the spec')}
+                            value={backupDescription}
+                            onChange={(e) =>
+                                setBackupDescription(e.target.value)
+                            }
+                        />
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="secondary">{__('Cancel')}</Button>
+                        </DialogClose>
+                        <Button
+                            onClick={() => {
+                                if (!selectedScrap) {
+                                    return;
+                                }
+
+                                router.post(
+                                    BackupController.backupScrap.url(
+                                        selectedScrap.id,
+                                    ),
+                                    { description: backupDescription },
+                                );
+
+                                setIsBackupDialogOpen(false);
+                            }}
+                        >
+                            <Download className="size-4" />
+                            {__('Save backup')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 md:p-6">
-                <input
-                    ref={uploadInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,.pdf,.doc,.docx,.md,.txt"
-                    className="hidden"
-                    onChange={(event) => {
-                        uploadBodyAsset(event.currentTarget.files?.[0] ?? null);
-                        event.currentTarget.value = '';
-                    }}
-                />
-                <section className="rounded-2xl border border-sidebar-border/70 bg-muted/40 px-4 py-3 dark:border-sidebar-border dark:bg-muted/20">
-                    <p className="text-sm text-muted-foreground">
-                        Catch it now. Organize it later.
-                    </p>
-                </section>
+                <Sheet
+                    open={showMobileRecent}
+                    onOpenChange={setShowMobileRecent}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setShowMobileRecent(true)}
+                        className="flex items-center justify-between rounded-2xl border border-sidebar-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground lg:hidden dark:border-sidebar-border dark:bg-muted/20"
+                    >
+                        <span>{__('Recent scraps')}</span>
+                        <ChevronDown className="size-4 -rotate-90" />
+                    </button>
+                    <SheetContent
+                        side="right"
+                        className="w-80 overflow-y-auto sm:w-96"
+                    >
+                        <SheetHeader>
+                            <SheetTitle>{__('Recent scraps')}</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4 space-y-3">
+                            <InfiniteScroll
+                                data="inboxItems"
+                                manual
+                                next={({ loading, fetch, hasMore }) =>
+                                    hasMore ? (
+                                        <div className="pt-2">
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                disabled={loading}
+                                                onClick={fetch}
+                                            >
+                                                {loading
+                                                    ? __('Loading...')
+                                                    : __('Load more')}
+                                            </Button>
+                                        </div>
+                                    ) : null
+                                }
+                            >
+                                <div className="space-y-3">
+                                    {recentScraps.map((item) => (
+                                        <Link
+                                            key={item.id}
+                                            href={
+                                                item.slug
+                                                    ? dashboardShow(item.slug)
+                                                    : dashboard()
+                                            }
+                                            prefetch
+                                            onClick={() => {
+                                                if (!item.slug) {
+                                                    openScrap(item);
+                                                }
 
-                <div className="grid gap-6 xl:grid-cols-[1.5fr_0.72fr]">
+                                                setShowMobileRecent(false);
+                                            }}
+                                            className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
+                                                selectedScrap?.id === item.id
+                                                    ? 'border-foreground/40 ring-2 ring-foreground/10'
+                                                    : 'border-border/70'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <p className="font-medium text-foreground">
+                                                        {item.title ??
+                                                            __(
+                                                                'Untitled scrap',
+                                                            )}
+                                                    </p>
+                                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                        {item.summary ??
+                                                            __(
+                                                                'No summary yet. This is still raw capture.',
+                                                            )}
+                                                    </p>
+                                                </div>
+                                                <Badge
+                                                    variant={toneForStatus(
+                                                        item.status,
+                                                    )}
+                                                >
+                                                    {statusLabels[
+                                                        item.status
+                                                    ] ?? item.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                <span>
+                                                    {sourceLabels[
+                                                        item.sourceType
+                                                    ] ?? item.sourceType}
+                                                </span>
+                                                <span>•</span>
+                                                <span>
+                                                    <DateDisplay
+                                                        value={item.occurredAt}
+                                                    />
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </InfiniteScroll>
+                        </div>
+                    </SheetContent>
+                </Sheet>
+
+                <div className="grid gap-6 lg:grid-cols-[1.5fr_0.72fr]">
                     <Card className="border-sidebar-border/70 shadow-sm">
                         <CardHeader className="gap-3">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -716,70 +891,93 @@ export default function Dashboard({
                                     <CardTitle className="text-2xl">
                                         {selectedScrap
                                             ? isEditingSelected
-                                                ? 'Edit scrap'
-                                                : 'Selected scrap'
-                                            : 'New scrap'}
+                                                ? __('Edit scrap')
+                                                : __('Selected scrap')
+                                            : __('New scrap')}
                                     </CardTitle>
                                     <CardDescription className="mt-2 max-w-2xl leading-6">
                                         {selectedScrap
                                             ? isEditingSelected
-                                                ? 'You are editing a saved scrap in the same capture workspace.'
-                                                : 'A selected scrap opens here first for review. Edit only when you decide it needs revision.'
-                                            : 'Keep it rough. A fragment, a customer quote, a meeting point, a reminder, a link with a note. The goal here is capture, not cleanup. AI can infer the shape after the fact.'}
+                                                ? __(
+                                                      'You are editing a saved scrap in the same capture workspace.',
+                                                  )
+                                                : null
+                                            : __(
+                                                  'Keep it rough. A fragment, a customer quote, a meeting point, a reminder, a link with a note. The goal here is capture, not cleanup. AI can infer the shape after the fact.',
+                                              )}
                                     </CardDescription>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {(!selectedScrap || isEditingSelected) && (
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex rounded-xl border border-border/70 bg-background p-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setEditorMode('write')
-                                                    }
-                                                    className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                                                        editorMode === 'write'
-                                                            ? 'bg-foreground text-background'
-                                                            : 'text-muted-foreground'
-                                                    }`}
-                                                >
-                                                    Write
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setEditorMode('preview')
-                                                    }
-                                                    className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                                                        editorMode === 'preview'
-                                                            ? 'bg-foreground text-background'
-                                                            : 'text-muted-foreground'
-                                                    }`}
-                                                >
-                                                    Preview
-                                                </button>
-                                            </div>
-                                            <Button
+                                        <div className="flex shrink-0 rounded-xl border border-border/70 bg-background p-1">
+                                            <button
                                                 type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={
-                                                    editorMode !== 'write'
+                                                onClick={() =>
+                                                    setEditorMode('write')
                                                 }
-                                                onClick={openUploadDialog}
+                                                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                                                    editorMode === 'write'
+                                                        ? 'bg-foreground text-background'
+                                                        : 'text-muted-foreground'
+                                                }`}
                                             >
-                                                <ImageUp className="size-4" />
-                                                Upload file
-                                            </Button>
+                                                {__('Write')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setEditorMode('preview')
+                                                }
+                                                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                                                    editorMode === 'preview'
+                                                        ? 'bg-foreground text-background'
+                                                        : 'text-muted-foreground'
+                                                }`}
+                                            >
+                                                {__('Preview')}
+                                            </button>
                                         </div>
                                     )}
-                                    {selectedScrap && (
+                                    {isEditingSelected && (
+                                        <Button
+                                            variant="outline"
+                                            disabled={
+                                                form.processing ||
+                                                archiveForm.processing
+                                            }
+                                            onClick={cancelEditSelectedScrap}
+                                        >
+                                            <Undo2 className="size-4" />
+                                            {__('Cancel')}
+                                        </Button>
+                                    )}
+                                    {selectedScrap && !isEditingSelected && (
                                         <Button
                                             variant="outline"
                                             onClick={beginNewScrap}
                                         >
                                             <PencilLine className="size-4" />
-                                            Write a new scrap
+                                            {__('New scrap')}
+                                        </Button>
+                                    )}
+                                    {selectedScrap && !isEditingSelected && (
+                                        <Button
+                                            onClick={beginEditSelectedScrap}
+                                        >
+                                            <PencilLine className="size-4" />
+                                            {__('Edit this scrap')}
+                                        </Button>
+                                    )}
+                                    {selectedScrap && !isEditingSelected && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setBackupDescription('');
+                                                setIsBackupDialogOpen(true);
+                                            }}
+                                        >
+                                            <Download className="size-4" />
+                                            {__('Create backup')}
                                         </Button>
                                     )}
                                 </div>
@@ -795,7 +993,9 @@ export default function Dashboard({
                                                     selectedScrap.status,
                                                 )}
                                             >
-                                                {selectedScrap.status}
+                                                {statusLabels[
+                                                    selectedScrap.status
+                                                ] ?? selectedScrap.status}
                                             </Badge>
                                             <Badge variant="outline">
                                                 {sourceLabels[
@@ -803,45 +1003,46 @@ export default function Dashboard({
                                                 ] ?? selectedScrap.sourceType}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">
-                                                {formatRelativeDate(
-                                                    selectedScrap.occurredAt,
-                                                )}
+                                                <DateDisplay
+                                                    value={
+                                                        selectedScrap.occurredAt
+                                                    }
+                                                />
                                             </span>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                disabled={
-                                                    archiveForm.processing
-                                                }
-                                                onClick={archiveSelectedScrap}
-                                            >
-                                                <Archive className="size-4" />
-                                                Send to archive
-                                            </Button>
-                                            <Button
-                                                onClick={beginEditSelectedScrap}
-                                            >
-                                                <PencilLine className="size-4" />
-                                                Edit this scrap
-                                            </Button>
                                         </div>
                                     </div>
 
                                     <div>
                                         <h2 className="text-xl font-semibold text-foreground">
                                             {selectedScrap.title ??
-                                                'Untitled scrap'}
+                                                __('Untitled scrap')}
                                         </h2>
-                                        {selectedScrap.slug && (
-                                            <p className="mt-2 font-mono text-xs text-muted-foreground">
-                                                /{selectedScrap.slug}
+                                        {selectedScrap.latestBackup && (
+                                            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <Download className="size-3 shrink-0" />
+                                                <span>
+                                                    {__('Last backup:')}{' '}
+                                                    <DateDisplay
+                                                        value={
+                                                            selectedScrap
+                                                                .latestBackup
+                                                                .createdAt
+                                                        }
+                                                    />
+                                                    {selectedScrap.latestBackup
+                                                        .description && (
+                                                        <span className="ml-1 text-foreground/60">
+                                                            —{' '}
+                                                            {
+                                                                selectedScrap
+                                                                    .latestBackup
+                                                                    .description
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </p>
                                         )}
-                                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                            {selectedScrap.summary ??
-                                                'This scrap does not have a summary yet.'}
-                                        </p>
                                     </div>
 
                                     <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
@@ -853,37 +1054,18 @@ export default function Dashboard({
                                     <div className="space-y-4 border-t border-border/70 pt-4">
                                         <div>
                                             <h3 className="text-sm font-medium text-foreground">
-                                                Add child scrap
+                                                {__('Add child scrap')}
                                             </h3>
                                             <p className="mt-1 text-sm text-muted-foreground">
-                                                Continue this thought directly
-                                                under the current article.
+                                                {__(
+                                                    'Continue this thought directly under the current article.',
+                                                )}
                                             </p>
                                         </div>
 
                                         <div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <Badge variant="outline">
-                                                    Under{' '}
-                                                    {selectedScrap.title ??
-                                                        'Untitled scrap'}
-                                                </Badge>
+                                            <div className="flex items-center justify-end gap-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        disabled={
-                                                            editorMode !==
-                                                            'write'
-                                                        }
-                                                        onClick={
-                                                            openUploadDialog
-                                                        }
-                                                    >
-                                                        <ImageUp className="size-4" />
-                                                        Upload file
-                                                    </Button>
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -895,13 +1077,21 @@ export default function Dashboard({
                                                         className="text-muted-foreground transition-colors hover:text-foreground"
                                                         aria-label={
                                                             showChildMetaFields
-                                                                ? 'Hide optional child title'
-                                                                : 'Show optional child title'
+                                                                ? __(
+                                                                      'Hide optional child title',
+                                                                  )
+                                                                : __(
+                                                                      'Show optional child title',
+                                                                  )
                                                         }
                                                         title={
                                                             showChildMetaFields
-                                                                ? 'Hide optional child title'
-                                                                : 'Show optional child title'
+                                                                ? __(
+                                                                      'Hide optional child title',
+                                                                  )
+                                                                : __(
+                                                                      'Show optional child title',
+                                                                  )
                                                         }
                                                     >
                                                         {showChildMetaFields ? (
@@ -910,7 +1100,7 @@ export default function Dashboard({
                                                             <CirclePlus className="size-4" />
                                                         )}
                                                     </button>
-                                                    <div className="flex rounded-xl border border-border/70 bg-background p-1">
+                                                    <div className="flex shrink-0 rounded-xl border border-border/70 bg-background p-1">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -925,7 +1115,7 @@ export default function Dashboard({
                                                                     : 'text-muted-foreground'
                                                             }`}
                                                         >
-                                                            Write
+                                                            {__('Write')}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -941,7 +1131,7 @@ export default function Dashboard({
                                                                     : 'text-muted-foreground'
                                                             }`}
                                                         >
-                                                            Preview
+                                                            {__('Preview')}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -950,7 +1140,7 @@ export default function Dashboard({
                                             {showChildMetaFields && (
                                                 <div className="space-y-2">
                                                     <Label htmlFor="child-scrap-title">
-                                                        Optional title
+                                                        {__('Optional title')}
                                                     </Label>
                                                     <Input
                                                         id="child-scrap-title"
@@ -962,7 +1152,9 @@ export default function Dashboard({
                                                                     .value,
                                                             )
                                                         }
-                                                        placeholder="Leave blank if the body says enough."
+                                                        placeholder={__(
+                                                            'Leave blank if the body says enough.',
+                                                        )}
                                                     />
                                                     <InputError
                                                         message={
@@ -974,7 +1166,7 @@ export default function Dashboard({
 
                                             <div className="space-y-2">
                                                 <Label htmlFor="child-scrap-body">
-                                                    Body
+                                                    {__('Body')}
                                                 </Label>
                                                 {editorMode === 'write' ? (
                                                     <textarea
@@ -997,7 +1189,9 @@ export default function Dashboard({
                                                         onPaste={
                                                             handleBodyPaste
                                                         }
-                                                        placeholder="Write in Markdown if it helps. # heading, - bullets, > quote, `code`, [link](https://...) ..."
+                                                        placeholder={__(
+                                                            'Write in Markdown. Drag & drop images or files to attach.',
+                                                        )}
                                                         className="min-h-48 w-full rounded-2xl border border-input bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                                                     />
                                                 ) : (
@@ -1011,8 +1205,9 @@ export default function Dashboard({
                                                             />
                                                         ) : (
                                                             <p className="text-sm text-muted-foreground">
-                                                                Nothing to
-                                                                preview yet.
+                                                                {__(
+                                                                    'Nothing to preview yet.',
+                                                                )}
                                                             </p>
                                                         )}
                                                     </div>
@@ -1032,7 +1227,7 @@ export default function Dashboard({
                                                     }
                                                 >
                                                     <CornerDownLeft className="size-4" />
-                                                    Save child scrap
+                                                    {__('Save child scrap')}
                                                 </Button>
                                                 <Button
                                                     variant="outline"
@@ -1042,7 +1237,7 @@ export default function Dashboard({
                                                     }
                                                 >
                                                     <Sparkles className="size-4" />
-                                                    Save and organize
+                                                    {__('Save and organize')}
                                                 </Button>
                                             </div>
                                         </div>
@@ -1050,12 +1245,14 @@ export default function Dashboard({
                                         <div className="flex items-center justify-between gap-3">
                                             <div>
                                                 <h3 className="text-sm font-medium text-foreground">
-                                                    Child scraps
+                                                    {__('Child scraps')}
                                                 </h3>
                                             </div>
                                             <span className="text-xs text-muted-foreground">
-                                                {selectedScrap.children.length}{' '}
-                                                linked
+                                                {__(':count linked', {
+                                                    count: selectedScrap
+                                                        .children.length,
+                                                })}
                                             </span>
                                         </div>
                                     </div>
@@ -1073,11 +1270,15 @@ export default function Dashboard({
                                                                 <div>
                                                                     <p className="font-medium text-foreground">
                                                                         {child.title ??
-                                                                            'Untitled scrap'}
+                                                                            __(
+                                                                                'Untitled scrap',
+                                                                            )}
                                                                     </p>
                                                                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                                                                         {child.summary ??
-                                                                            'No summary yet.'}
+                                                                            __(
+                                                                                'No summary yet.',
+                                                                            )}
                                                                     </p>
                                                                 </div>
                                                                 <Badge
@@ -1085,9 +1286,11 @@ export default function Dashboard({
                                                                         child.status,
                                                                     )}
                                                                 >
-                                                                    {
-                                                                        child.status
-                                                                    }
+                                                                    {statusLabels[
+                                                                        child
+                                                                            .status
+                                                                    ] ??
+                                                                        child.status}
                                                                 </Badge>
                                                             </div>
                                                             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -1100,9 +1303,11 @@ export default function Dashboard({
                                                                 </span>
                                                                 <span>•</span>
                                                                 <span>
-                                                                    {formatRelativeDate(
-                                                                        child.occurredAt,
-                                                                    )}
+                                                                    <DateDisplay
+                                                                        value={
+                                                                            child.occurredAt
+                                                                        }
+                                                                    />
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1112,69 +1317,53 @@ export default function Dashboard({
                                         </div>
                                     )}
 
-                                    {relatedScraps.length > 0 && (
-                                        <div className="space-y-3 border-t border-border/70 pt-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div>
-                                                    <h3 className="text-sm font-medium text-foreground">
-                                                        Related scraps
-                                                    </h3>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        Nearest by embedding
-                                                        similarity.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {relatedScraps.map(
-                                                    (related) => (
-                                                        <Link
-                                                            key={related.id}
-                                                            href={
-                                                                related.slug
-                                                                    ? dashboardShow(
-                                                                          related.slug,
-                                                                      )
-                                                                    : dashboard()
-                                                            }
-                                                            prefetch
-                                                            className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
-                                                        >
-                                                            <div className="flex items-start justify-between gap-2">
-                                                                <div className="min-w-0">
-                                                                    <p className="truncate text-sm font-medium text-foreground">
-                                                                        {related.title ??
-                                                                            'Untitled scrap'}
-                                                                    </p>
-                                                                    {related.summary && (
-                                                                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                                                            {
-                                                                                related.summary
-                                                                            }
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                                    {Math.round(
-                                                                        related.similarity *
-                                                                            100,
-                                                                    )}
-                                                                    %
-                                                                </span>
-                                                            </div>
-                                                        </Link>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="border-t border-border/70 pt-4">
-                                        <p className="text-sm leading-6 text-muted-foreground">
-                                            Review it here first. If the capture
-                                            needs cleanup or more detail, switch
-                                            into edit mode from the header.
-                                        </p>
+                                    <div className="flex items-center justify-end gap-4 border-t border-border/70 pt-4">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={
+                                                        archiveForm.processing
+                                                    }
+                                                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                >
+                                                    <Archive className="size-4" />
+                                                    {__('Send to archive')}
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        {__('Send to archive?')}
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        {__(
+                                                            'This scrap will be moved to the archive and removed from the inbox.',
+                                                        )}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <DialogFooter>
+                                                    <DialogClose asChild>
+                                                        <Button variant="secondary">
+                                                            {__('Cancel')}
+                                                        </Button>
+                                                    </DialogClose>
+                                                    <Button
+                                                        variant="destructive"
+                                                        disabled={
+                                                            archiveForm.processing
+                                                        }
+                                                        onClick={
+                                                            archiveSelectedScrap
+                                                        }
+                                                    >
+                                                        <Archive className="size-4" />
+                                                        {__('Send to archive')}
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
                                     </div>
                                 </div>
                             )}
@@ -1188,7 +1377,9 @@ export default function Dashboard({
                                                     selectedScrap.status,
                                                 )}
                                             >
-                                                {selectedScrap.status}
+                                                {statusLabels[
+                                                    selectedScrap.status
+                                                ] ?? selectedScrap.status}
                                             </Badge>
                                             <Badge variant="outline">
                                                 {sourceLabels[
@@ -1196,9 +1387,11 @@ export default function Dashboard({
                                                 ] ?? selectedScrap.sourceType}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">
-                                                {formatRelativeDate(
-                                                    selectedScrap.occurredAt,
-                                                )}
+                                                <DateDisplay
+                                                    value={
+                                                        selectedScrap.occurredAt
+                                                    }
+                                                />
                                             </span>
                                         </div>
                                     )}
@@ -1207,12 +1400,16 @@ export default function Dashboard({
                                         <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
                                             <div>
                                                 <p className="text-sm font-medium text-foreground">
-                                                    Optional metadata
+                                                    {__('Optional metadata')}
                                                 </p>
                                                 <p className="text-sm text-muted-foreground">
                                                     {canEditSlug
-                                                        ? 'Add a title and slug only when they help.'
-                                                        : 'Add a title only when it helps.'}
+                                                        ? __(
+                                                              'Add a title and slug only when they help.',
+                                                          )
+                                                        : __(
+                                                              'Add a title only when it helps.',
+                                                          )}
                                                 </p>
                                             </div>
                                             <button
@@ -1225,13 +1422,21 @@ export default function Dashboard({
                                                 className="text-muted-foreground transition-colors hover:text-foreground"
                                                 aria-label={
                                                     showMainMetaFields
-                                                        ? 'Hide optional metadata'
-                                                        : 'Show optional metadata'
+                                                        ? __(
+                                                              'Hide optional metadata',
+                                                          )
+                                                        : __(
+                                                              'Show optional metadata',
+                                                          )
                                                 }
                                                 title={
                                                     showMainMetaFields
-                                                        ? 'Hide optional metadata'
-                                                        : 'Show optional metadata'
+                                                        ? __(
+                                                              'Hide optional metadata',
+                                                          )
+                                                        : __(
+                                                              'Show optional metadata',
+                                                          )
                                                 }
                                             >
                                                 {showMainMetaFields ? (
@@ -1245,7 +1450,7 @@ export default function Dashboard({
                                             <div className="space-y-4 rounded-2xl border border-border/70 bg-background/60 p-4">
                                                 <div className="space-y-2">
                                                     <Label htmlFor="scrap-title">
-                                                        Optional title
+                                                        {__('Optional title')}
                                                     </Label>
                                                     <Input
                                                         id="scrap-title"
@@ -1257,7 +1462,9 @@ export default function Dashboard({
                                                                     .value,
                                                             )
                                                         }
-                                                        placeholder="Leave blank if the body says enough."
+                                                        placeholder={__(
+                                                            'Leave blank if the body says enough.',
+                                                        )}
                                                     />
                                                     <InputError
                                                         message={
@@ -1269,7 +1476,9 @@ export default function Dashboard({
                                                 {canEditSlug && (
                                                     <div className="space-y-2">
                                                         <Label htmlFor="scrap-slug">
-                                                            Optional slug
+                                                            {__(
+                                                                'Optional slug',
+                                                            )}
                                                         </Label>
                                                         <Input
                                                             id="scrap-slug"
@@ -1297,7 +1506,9 @@ export default function Dashboard({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="scrap-body">Body</Label>
+                                        <Label htmlFor="scrap-body">
+                                            {__('Body')}
+                                        </Label>
                                         {editorMode === 'write' ? (
                                             <textarea
                                                 ref={mainTextareaRef}
@@ -1314,7 +1525,9 @@ export default function Dashboard({
                                                     event.preventDefault()
                                                 }
                                                 onPaste={handleBodyPaste}
-                                                placeholder="Write in Markdown if it helps. # heading, - bullets, > quote, `code`, [link](https://...) ..."
+                                                placeholder={__(
+                                                    'Write in Markdown. Drag & drop images or files to attach.',
+                                                )}
                                                 className="min-h-72 w-full rounded-2xl border border-input bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                                             />
                                         ) : (
@@ -1327,7 +1540,9 @@ export default function Dashboard({
                                                     />
                                                 ) : (
                                                     <p className="text-sm text-muted-foreground">
-                                                        Nothing to preview yet.
+                                                        {__(
+                                                            'Nothing to preview yet.',
+                                                        )}
                                                     </p>
                                                 )}
                                             </div>
@@ -1339,40 +1554,6 @@ export default function Dashboard({
 
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex flex-wrap gap-2">
-                                            {selectedScrap &&
-                                                isEditingSelected && (
-                                                    <>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="lg"
-                                                            className="min-w-32"
-                                                            disabled={
-                                                                form.processing ||
-                                                                archiveForm.processing
-                                                            }
-                                                            onClick={
-                                                                cancelEditSelectedScrap
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="lg"
-                                                            className="min-w-40"
-                                                            disabled={
-                                                                form.processing ||
-                                                                archiveForm.processing
-                                                            }
-                                                            onClick={
-                                                                archiveSelectedScrap
-                                                            }
-                                                        >
-                                                            <Archive className="size-4" />
-                                                            Send to archive
-                                                        </Button>
-                                                    </>
-                                                )}
                                             <Button
                                                 size="lg"
                                                 className="min-w-36"
@@ -1386,8 +1567,8 @@ export default function Dashboard({
                                             >
                                                 <CornerDownLeft className="size-4" />
                                                 {selectedScrap
-                                                    ? 'Save changes'
-                                                    : 'Save scrap'}
+                                                    ? __('Save changes')
+                                                    : __('Save scrap')}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -1401,16 +1582,14 @@ export default function Dashboard({
                                             >
                                                 <Sparkles className="size-4" />
                                                 {selectedScrap
-                                                    ? 'Save and organize'
-                                                    : 'AI organize on save'}
+                                                    ? __('Save and organize')
+                                                    : __('AI organize on save')}
                                             </Button>
                                         </div>
                                         <p className="text-xs leading-5 text-muted-foreground">
-                                            Type, tags, priority, and summary
-                                            can be inferred later through
-                                            structured output. Paste images or
-                                            drop and upload files to insert
-                                            Markdown automatically.
+                                            {__(
+                                                'Type, tags, priority, and summary can be inferred later through structured output. Paste images or drop and upload files to insert Markdown automatically.',
+                                            )}
                                         </p>
                                     </div>
                                 </>
@@ -1418,113 +1597,299 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
 
-                    <div className="grid gap-6">
+                    <div className="hidden gap-6 lg:grid">
                         <Card className="border-sidebar-border/70 shadow-sm">
                             <CardHeader>
-                                <CardTitle>Recent scraps</CardTitle>
-                                <CardDescription>
-                                    The right side should reassure you that what
-                                    you write has landed somewhere retrievable.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <InfiniteScroll
-                                    data="inboxItems"
-                                    manual
-                                    next={({ loading, fetch, hasMore }) =>
-                                        hasMore ? (
-                                            <div className="pt-2">
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full"
-                                                    disabled={loading}
-                                                    onClick={fetch}
-                                                >
-                                                    {loading
-                                                        ? 'Loading...'
-                                                        : 'Load more'}
-                                                </Button>
-                                            </div>
-                                        ) : null
-                                    }
-                                >
-                                    <div className="space-y-3">
-                                        {recentScraps.map((item) => (
-                                            <Link
-                                                key={item.id}
-                                                href={
-                                                    item.slug
-                                                        ? dashboardShow(
-                                                              item.slug,
-                                                          )
-                                                        : dashboard()
-                                                }
-                                                prefetch
-                                                onClick={() => {
-                                                    if (!item.slug) {
-                                                        openScrap(item);
-                                                    }
-                                                }}
-                                                className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
-                                                    selectedScrap?.id ===
-                                                    item.id
-                                                        ? 'border-foreground/40 ring-2 ring-foreground/10'
-                                                        : 'border-border/70'
-                                                }`}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div>
-                                                        <p className="font-medium text-foreground">
-                                                            {item.title ??
-                                                                'Untitled scrap'}
-                                                        </p>
-                                                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                            {item.summary ??
-                                                                'No summary yet. This is still raw capture.'}
-                                                        </p>
-                                                    </div>
-                                                    <Badge
-                                                        variant={toneForStatus(
-                                                            item.status,
-                                                        )}
-                                                    >
-                                                        {item.status}
-                                                    </Badge>
-                                                </div>
-                                                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                    <span>
-                                                        {sourceLabels[
-                                                            item.sourceType
-                                                        ] ?? item.sourceType}
-                                                    </span>
-                                                    <span>•</span>
-                                                    <span>
-                                                        {formatRelativeDate(
-                                                            item.occurredAt,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </Link>
-                                        ))}
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center rounded-lg bg-muted/50 p-0.5 text-sm">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setRightPanelTab('recent')
+                                            }
+                                            className={`rounded-md px-3 py-1.5 transition-colors ${
+                                                rightPanelTab === 'recent'
+                                                    ? 'bg-foreground text-background'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {__('Recent')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setRightPanelTab('similar')
+                                            }
+                                            disabled={
+                                                relatedScraps.length === 0
+                                            }
+                                            className={`rounded-md px-3 py-1.5 transition-colors ${
+                                                rightPanelTab === 'similar'
+                                                    ? 'bg-foreground text-background'
+                                                    : relatedScraps.length === 0
+                                                      ? 'cursor-not-allowed text-muted-foreground/40'
+                                                      : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {__('Similar')}
+                                        </button>
                                     </div>
-                                </InfiniteScroll>
-                            </CardContent>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setIsRecentScrapsOpen(
+                                                (current) => !current,
+                                            )
+                                        }
+                                        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                                        aria-label={
+                                            isRecentScrapsOpen
+                                                ? __('Collapse')
+                                                : __('Expand')
+                                        }
+                                    >
+                                        <ChevronDown
+                                            className={`size-4 transition-transform duration-200 ${isRecentScrapsOpen ? 'rotate-0' : '-rotate-90'}`}
+                                        />
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            {isRecentScrapsOpen && (
+                                <CardContent className="space-y-3">
+                                    {rightPanelTab === 'similar' && (
+                                        <div className="space-y-2">
+                                            {relatedScraps.map((related) => (
+                                                <Link
+                                                    key={related.id}
+                                                    href={
+                                                        related.slug
+                                                            ? dashboardShow(
+                                                                  related.slug,
+                                                              )
+                                                            : dashboard()
+                                                    }
+                                                    prefetch
+                                                    className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-medium text-foreground">
+                                                                {related.title ??
+                                                                    __(
+                                                                        'Untitled scrap',
+                                                                    )}
+                                                            </p>
+                                                            {related.summary && (
+                                                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                                    {
+                                                                        related.summary
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                                            {Math.round(
+                                                                related.similarity *
+                                                                    100,
+                                                            )}
+                                                            %
+                                                        </span>
+                                                    </div>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {rightPanelTab === 'recent' && (
+                                        <InfiniteScroll
+                                            data="inboxItems"
+                                            manual
+                                            next={({
+                                                loading,
+                                                fetch,
+                                                hasMore,
+                                            }) =>
+                                                hasMore ? (
+                                                    <div className="pt-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            className="w-full"
+                                                            disabled={loading}
+                                                            onClick={fetch}
+                                                        >
+                                                            {loading
+                                                                ? __(
+                                                                      'Loading...',
+                                                                  )
+                                                                : __(
+                                                                      'Load more',
+                                                                  )}
+                                                        </Button>
+                                                    </div>
+                                                ) : null
+                                            }
+                                        >
+                                            <div className="space-y-3">
+                                                {recentScraps.map((item) => (
+                                                    <Link
+                                                        key={item.id}
+                                                        href={
+                                                            item.slug
+                                                                ? dashboardShow(
+                                                                      item.slug,
+                                                                  )
+                                                                : dashboard()
+                                                        }
+                                                        prefetch
+                                                        onClick={() => {
+                                                            if (!item.slug) {
+                                                                openScrap(item);
+                                                            }
+                                                        }}
+                                                        className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
+                                                            selectedScrap?.id ===
+                                                            item.id
+                                                                ? 'border-foreground/40 ring-2 ring-foreground/10'
+                                                                : 'border-border/70'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div>
+                                                                <p className="font-medium text-foreground">
+                                                                    {item.title ??
+                                                                        __(
+                                                                            'Untitled scrap',
+                                                                        )}
+                                                                </p>
+                                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                                    {item.summary ??
+                                                                        __(
+                                                                            'No summary yet. This is still raw capture.',
+                                                                        )}
+                                                                </p>
+                                                            </div>
+                                                            <Badge
+                                                                variant={toneForStatus(
+                                                                    item.status,
+                                                                )}
+                                                            >
+                                                                {statusLabels[
+                                                                    item.status
+                                                                ] ??
+                                                                    item.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                            <span>
+                                                                {sourceLabels[
+                                                                    item
+                                                                        .sourceType
+                                                                ] ??
+                                                                    item.sourceType}
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span>
+                                                                <DateDisplay
+                                                                    value={
+                                                                        item.occurredAt
+                                                                    }
+                                                                />
+                                                            </span>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </InfiniteScroll>
+                                    )}
+                                </CardContent>
+                            )}
                         </Card>
                     </div>
                 </div>
+            </div>
+            <div className="flex justify-end px-1">
+                <a
+                    href={BackupController.download.url()}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                    <Download className="size-3" />
+                    {__('Download backup')}
+                </a>
             </div>
         </>
     );
 }
 
-Dashboard.layout = {
-    breadcrumbs: [
-        {
-            title: 'Dashboard',
-            href: dashboard(),
-        },
-    ],
-};
+function toJst(value: string): string {
+    const date = new Date(value);
+    const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    const y = jst.getUTCFullYear();
+    const mo = String(jst.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(jst.getUTCDate()).padStart(2, '0');
+    const h = String(jst.getUTCHours()).padStart(2, '0');
+    const mi = String(jst.getUTCMinutes()).padStart(2, '0');
+
+    return `${y}/${mo}/${d} ${h}:${mi}`;
+}
+
+function relativeLabel(value: string): string {
+    const diff = Math.floor((Date.now() - new Date(value).getTime()) / 1000);
+
+    if (diff < 60) {
+        return `${diff}秒前`;
+    }
+
+    if (diff < 3600) {
+        return `${Math.floor(diff / 60)}分前`;
+    }
+
+    if (diff < 86400) {
+        return `${Math.floor(diff / 3600)}時間前`;
+    }
+
+    if (diff < 86400 * 30) {
+        return `${Math.floor(diff / 86400)}日前`;
+    }
+
+    if (diff < 86400 * 365) {
+        return `${Math.floor(diff / (86400 * 30))}ヶ月前`;
+    }
+
+    return `${Math.floor(diff / (86400 * 365))}年前`;
+}
+
+function DateDisplay({ value }: { value: string | null }) {
+    const { __ } = useLang();
+    const [refreshTick, setRefreshTick] = useState(0);
+
+    useEffect(() => {
+        if (!value) {
+            return;
+        }
+
+        const id = setInterval(() => setRefreshTick((tick) => tick + 1), 60_000);
+
+        return () => clearInterval(id);
+    }, [value]);
+
+    if (!value) {
+        return <>{__('No timestamp')}</>;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return <>{__('Invalid timestamp')}</>;
+    }
+
+    void refreshTick;
+
+    return (
+        <>
+            {toJst(value)}
+            {` (${relativeLabel(value)})`}
+        </>
+    );
+}
 
 function MarkdownPreview({ content }: { content: string }) {
     const lines = content.split('\n');
