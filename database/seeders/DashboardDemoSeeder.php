@@ -129,6 +129,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(3),
                     'extracted_data' => ['kind' => 'decision', 'priority' => 'high'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'spec']],
                 ],
                 [
                     'key' => 's2',
@@ -141,6 +142,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(3)->addMinutes(10),
                     'extracted_data' => ['kind' => 'idea', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'spec']],
                 ],
                 [
                     'key' => 's3',
@@ -153,6 +155,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'raw',
                     'occurred_at' => $now->subDays(2),
                     'extracted_data' => ['kind' => 'task', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'spec']],
                 ],
                 [
                     'key' => 's4',
@@ -165,6 +168,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'raw',
                     'occurred_at' => $now->subDays(2)->addHours(2),
                     'extracted_data' => ['kind' => 'pain', 'priority' => 'high'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'support']],
                 ],
                 [
                     'key' => 's5',
@@ -177,6 +181,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDay(),
                     'extracted_data' => ['kind' => 'pain', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'support']],
                 ],
                 [
                     'key' => 's6',
@@ -189,6 +194,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDay()->addMinutes(30),
                     'extracted_data' => ['kind' => 'request', 'priority' => 'low'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'support']],
                 ],
                 [
                     'key' => 's7',
@@ -201,6 +207,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(4),
                     'extracted_data' => ['kind' => 'progress', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'dev']],
                 ],
                 [
                     'key' => 's8',
@@ -213,6 +220,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(4)->addHours(1),
                     'extracted_data' => ['kind' => 'progress', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'dev']],
                 ],
                 [
                     'key' => 's9',
@@ -225,6 +233,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'raw',
                     'occurred_at' => $now->subHours(10),
                     'extracted_data' => ['kind' => 'plan', 'priority' => 'high'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'dev']],
                 ],
                 [
                     'key' => 's10',
@@ -237,6 +246,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(5),
                     'extracted_data' => ['kind' => 'research', 'priority' => 'medium'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'research']],
                 ],
                 [
                     'key' => 's11',
@@ -249,6 +259,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'processed',
                     'occurred_at' => $now->subDays(5)->addMinutes(20),
                     'extracted_data' => ['kind' => 'principle', 'priority' => 'high'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'research']],
                 ],
                 [
                     'key' => 's12',
@@ -261,6 +272,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => 'archived',
                     'occurred_at' => $now->subDays(6),
                     'extracted_data' => ['kind' => 'idea', 'priority' => 'low'],
+                    'meta' => ['seeded' => true, 'tags' => ['yomitoki', 'research']],
                 ],
             ];
 
@@ -280,7 +292,7 @@ class DashboardDemoSeeder extends Seeder
                     'occurred_at' => $scrap['occurred_at'],
                     'processed_at' => $scrap['status'] === 'raw' ? null : $scrap['occurred_at']->addMinutes(5),
                     'extracted_data' => json_encode($scrap['extracted_data'], JSON_THROW_ON_ERROR),
-                    'meta' => json_encode(['seeded' => true], JSON_THROW_ON_ERROR),
+                    'meta' => json_encode($scrap['meta'] ?? ['seeded' => true], JSON_THROW_ON_ERROR),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);

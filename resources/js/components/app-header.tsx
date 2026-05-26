@@ -1,6 +1,6 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Link, usePage } from '@inertiajs/react';
-import { Archive, LayoutGrid, Menu, Search } from 'lucide-react';
+import { FileText, LayoutGrid, Menu, Search } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -28,7 +28,7 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
-import { archives, dashboard } from '@/routes';
+import { articles, dashboard } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -52,16 +52,16 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
             icon: LayoutGrid,
         },
         {
-            title: __('Archives'),
-            href: archives(),
-            icon: Archive,
+            title: __('Articles'),
+            href: articles(),
+            icon: FileText,
         },
     ];
 
     return (
         <>
             <div className="border-b border-sidebar-border/80">
-                <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
+                <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl md:px-6">
                     {/* Mobile Menu */}
                     <div className="lg:hidden">
                         <Sheet>
@@ -184,7 +184,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
             </div>
             {breadcrumbs.length > 1 && (
                 <div className="flex w-full border-b border-sidebar-border/70">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl">
+                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl md:px-6">
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>
                 </div>

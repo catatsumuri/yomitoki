@@ -152,3 +152,73 @@ test('user cannot backup another users scrap', function () {
         ->post(route('scraps.backup', $scrap))
         ->assertForbidden();
 });
+
+test('guests cannot access the bulk backup stream', function () {
+    $this->get(route('backup.bulk-stream'))
+        ->assertRedirect(route('login'));
+});
+
+test('bulk backup stream emits SSE progress and complete events', function () {
+    Storage::fake();
+
+    $user = User::factory()->create();
+
+    $scrapA = Scrap::factory()->for($user)->create([
+        'slug' => 'scrap-a',
+        'title' => 'Scrap A',
+        'content_markdown' => '# A',
+    ]);
+
+    $scrapB = Scrap::factory()->for($user)->create([
+        'slug' => 'scrap-b',
+        'title' => 'Scrap B',
+        'content_markdown' => '# B',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('backup.bulk-stream', [
+        'ids' => [$scrapA->id, $scrapB->id],
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('Content-Type', 'text/event-stream; charset=UTF-8');
+
+    $body = $response->streamedContent();
+
+    expect($body)
+        ->toContain('event: progress')
+        ->toContain('"status":"done"')
+        ->toContain('event: complete')
+        ->toContain('"succeeded":2');
+
+    Storage::assertExists(
+        collect(Storage::allFiles("backups/{$user->id}"))
+            ->first(fn (string $f) => str_starts_with(basename($f), 'scrap-a-')),
+    );
+
+    Storage::assertExists(
+        collect(Storage::allFiles("backups/{$user->id}"))
+            ->first(fn (string $f) => str_starts_with(basename($f), 'scrap-b-')),
+    );
+});
+
+test('bulk backup stream silently skips scraps belonging to another user', function () {
+    Storage::fake();
+
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    $ownScrap = Scrap::factory()->for($user)->create(['slug' => 'mine', 'content_markdown' => '# Mine']);
+    $otherScrap = Scrap::factory()->for($other)->create(['slug' => 'theirs', 'content_markdown' => '# Theirs']);
+
+    $response = $this->actingAs($user)->get(route('backup.bulk-stream', [
+        'ids' => [$ownScrap->id, $otherScrap->id],
+    ]));
+
+    $response->assertOk();
+
+    $body = $response->streamedContent();
+
+    // Only 1 succeeded — the other user's scrap was silently ignored
+    expect($body)->toContain('"succeeded":1');
+    Storage::assertMissing("backups/{$user->id}/theirs.zip");
+});

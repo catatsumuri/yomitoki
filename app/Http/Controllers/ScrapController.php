@@ -128,7 +128,8 @@ class ScrapController extends Controller
         ]);
 
         return redirect()->route(
-            ...$this->dashboardRedirectTargetForScrap(
+            ...$this->workspaceRedirectTargetForScrap(
+                request: $request,
                 scrap: $scrap,
                 parentScrap: $parentScrap,
             ),
@@ -180,8 +181,47 @@ class ScrapController extends Controller
         ]);
 
         return redirect()->route(
-            ...$this->dashboardRedirectTargetForScrap($scrap),
+            ...$this->workspaceRedirectTargetForScrap($request, $scrap),
         );
+    }
+
+    /**
+     * Archive multiple top-level scraps (and their children) in one request.
+     */
+    public function bulkArchive(Request $request): RedirectResponse
+    {
+        $ids = array_values(array_filter(array_map('intval', $request->array('ids'))));
+        $user = $request->user();
+
+        $scraps = Scrap::query()
+            ->where('user_id', $user->id)
+            ->whereIn('id', $ids)
+            ->whereNull('parent_id')
+            ->get();
+
+        if ($scraps->isEmpty()) {
+            return redirect()->route('articles');
+        }
+
+        $allIdsToArchive = $scraps
+            ->flatMap(fn (Scrap $scrap) => $this->collectScrapTreeIds($scrap))
+            ->unique()
+            ->values()
+            ->all();
+
+        Scrap::query()
+            ->whereIn('id', $allIdsToArchive)
+            ->update([
+                'status' => 'archived',
+                'updated_at' => now(),
+            ]);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __(':count scraps sent to archive.', ['count' => $scraps->count()]),
+        ]);
+
+        return redirect()->route('articles');
     }
 
     /**
@@ -208,7 +248,7 @@ class ScrapController extends Controller
         ]);
 
         return redirect()->route(
-            ...$this->dashboardRedirectTargetAfterArchive($scrap),
+            ...$this->workspaceRedirectTargetAfterArchive($request, $scrap),
         );
     }
 
@@ -239,7 +279,7 @@ class ScrapController extends Controller
         $scrap->refresh();
 
         return redirect()->route(
-            ...$this->dashboardRedirectTargetAfterRestore($scrap),
+            ...$this->workspaceRedirectTargetAfterRestore($request, $scrap),
         );
     }
 
@@ -263,7 +303,12 @@ class ScrapController extends Controller
                 : __('Scrap was permanently deleted.'),
         ]);
 
-        return redirect()->route('archives');
+        [$routeName, $parameters] = $this->workspaceRouteContext($request);
+
+        return to_route($routeName, [
+            ...$parameters,
+            'status' => 'archived',
+        ]);
     }
 
     /**
@@ -496,23 +541,27 @@ TEXT;
      *
      * @return array{0: string, 1?: array<string, string>}
      */
-    private function dashboardRedirectTargetForScrap(
+    private function workspaceRedirectTargetForScrap(
+        Request $request,
         Scrap $scrap,
         ?Scrap $parentScrap = null,
     ): array {
+        [$indexRoute, $query] = $this->workspaceRouteContext($request);
+        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+
         if ($scrap->parent_id !== null) {
             $parentScrap ??= $scrap->parent;
 
             if ($parentScrap?->slug !== null) {
-                return ['dashboard.show', ['slug' => $parentScrap->slug]];
+                return [$showRoute, [...$query, 'slug' => $parentScrap->slug]];
             }
         }
 
         if ($scrap->slug !== null) {
-            return ['dashboard.show', ['slug' => $scrap->slug]];
+            return [$showRoute, [...$query, 'slug' => $scrap->slug]];
         }
 
-        return ['dashboard'];
+        return [$indexRoute, $query];
     }
 
     /**
@@ -520,13 +569,16 @@ TEXT;
      *
      * @return array{0: string, 1?: array<string, string>}
      */
-    private function dashboardRedirectTargetAfterArchive(Scrap $scrap): array
+    private function workspaceRedirectTargetAfterArchive(Request $request, Scrap $scrap): array
     {
+        [$indexRoute, $query] = $this->workspaceRouteContext($request);
+        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+
         if ($scrap->parent_id !== null && $scrap->parent?->slug !== null) {
-            return ['dashboard.show', ['slug' => $scrap->parent->slug]];
+            return [$showRoute, [...$query, 'slug' => $scrap->parent->slug]];
         }
 
-        return ['dashboard'];
+        return [$indexRoute, $query];
     }
 
     /**
@@ -534,16 +586,53 @@ TEXT;
      *
      * @return array{0: string, 1?: array<string, string>}
      */
-    private function dashboardRedirectTargetAfterRestore(Scrap $scrap): array
+    private function workspaceRedirectTargetAfterRestore(Request $request, Scrap $scrap): array
     {
+        [$indexRoute, $query] = $this->workspaceRouteContext($request);
+        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+
+        if (($query['status'] ?? null) === 'archived') {
+            unset($query['status']);
+        }
+
         if ($scrap->parent_id !== null && $scrap->parent?->slug !== null) {
-            return ['dashboard.show', ['slug' => $scrap->parent->slug]];
+            return [$showRoute, [...$query, 'slug' => $scrap->parent->slug]];
         }
 
         if ($scrap->slug !== null) {
-            return ['dashboard.show', ['slug' => $scrap->slug]];
+            return [$showRoute, [...$query, 'slug' => $scrap->slug]];
         }
 
-        return ['dashboard'];
+        return [$indexRoute, $query];
+    }
+
+    /**
+     * Resolve the current workspace route names and supported query parameters.
+     *
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function workspaceRouteContext(Request $request): array
+    {
+        $referer = (string) $request->headers->get('referer', '');
+        $path = parse_url($referer, PHP_URL_PATH) ?: '';
+        $rawQuery = parse_url($referer, PHP_URL_QUERY) ?: '';
+        $parsedQuery = [];
+
+        parse_str($rawQuery, $parsedQuery);
+
+        $query = array_filter([
+            'tag' => is_string($parsedQuery['tag'] ?? null) && $parsedQuery['tag'] !== ''
+                ? $parsedQuery['tag']
+                : null,
+            'status' => ($parsedQuery['status'] ?? null) === 'archived'
+                ? 'archived'
+                : null,
+        ]);
+
+        if (str_starts_with($path, '/articles')) {
+            return ['articles', $query];
+        }
+
+        return ['dashboard', $query];
     }
 }

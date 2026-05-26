@@ -373,6 +373,24 @@ test('authenticated users can restore archived top level scraps', function () {
     $response->assertInertiaFlash('toast.message', 'Scrap was restored.');
 });
 
+test('restoring an archived scrap from the articles workspace redirects back to articles', function () {
+    $user = User::factory()->create();
+    $scrap = Scrap::factory()->for($user)->create([
+        'status' => 'archived',
+        'slug' => 'restore-from-articles',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->withHeader('referer', route('articles.show', [
+            'slug' => 'restore-from-articles',
+            'status' => 'archived',
+        ]))
+        ->post(route('scraps.restore', $scrap));
+
+    $response->assertRedirect(route('articles.show', ['slug' => 'restore-from-articles']));
+});
+
 test('restoring a child scrap also restores archived ancestors', function () {
     $user = User::factory()->create();
     $parentScrap = Scrap::factory()->for($user)->create([
@@ -410,8 +428,27 @@ test('authenticated users can permanently delete archived scraps', function () {
         ->delete(route('scraps.destroy', $scrap));
 
     $this->assertModelMissing($scrap);
-    $response->assertRedirect(route('archives'));
+    $response->assertRedirect(route('dashboard', ['status' => 'archived']));
     $response->assertInertiaFlash('toast.message', 'Scrap was permanently deleted.');
+});
+
+test('permanently deleting an archived scrap from the articles workspace redirects back to articles', function () {
+    $user = User::factory()->create();
+    $scrap = Scrap::factory()->for($user)->create([
+        'status' => 'archived',
+        'slug' => 'delete-from-articles',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->withHeader('referer', route('articles.show', [
+            'slug' => 'delete-from-articles',
+            'status' => 'archived',
+        ]))
+        ->delete(route('scraps.destroy', $scrap));
+
+    $this->assertModelMissing($scrap);
+    $response->assertRedirect(route('articles', ['status' => 'archived']));
 });
 
 test('permanently deleting an archived parent removes its child scraps', function () {
@@ -431,6 +468,48 @@ test('permanently deleting an archived parent removes its child scraps', functio
 
     $this->assertModelMissing($parentScrap);
     $this->assertModelMissing($childScrap);
-    $response->assertRedirect(route('archives'));
+    $response->assertRedirect(route('dashboard', ['status' => 'archived']));
     $response->assertInertiaFlash('toast.message', 'Scrap and its child scraps were permanently deleted.');
+});
+
+test('authenticated users can bulk archive multiple scraps', function () {
+    $user = User::factory()->create();
+
+    $scrapA = Scrap::factory()->for($user)->create(['status' => 'raw', 'slug' => 'bulk-a']);
+    $scrapB = Scrap::factory()->for($user)->create(['status' => 'processed', 'slug' => 'bulk-b']);
+    $child = Scrap::factory()->for($user)->create([
+        'parent_id' => $scrapA->id,
+        'status' => 'raw',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->post(route('scraps.bulk-archive'), ['ids' => [$scrapA->id, $scrapB->id]]);
+
+    expect($scrapA->fresh()->status)->toBe('archived');
+    expect($scrapB->fresh()->status)->toBe('archived');
+    expect($child->fresh()->status)->toBe('archived');
+
+    $response->assertRedirect(route('articles'));
+    $response->assertInertiaFlash('toast.message', '2 件をアーカイブしました。');
+});
+
+test('bulk archive silently ignores scraps belonging to another user', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    $ownScrap = Scrap::factory()->for($user)->create(['status' => 'raw']);
+    $otherScrap = Scrap::factory()->for($other)->create(['status' => 'raw']);
+
+    $this->actingAs($user)->post(route('scraps.bulk-archive'), [
+        'ids' => [$ownScrap->id, $otherScrap->id],
+    ]);
+
+    expect($ownScrap->fresh()->status)->toBe('archived');
+    expect($otherScrap->fresh()->status)->toBe('raw');
+});
+
+test('guests cannot bulk archive scraps', function () {
+    $this->post(route('scraps.bulk-archive'), ['ids' => [1]])
+        ->assertRedirect(route('login'));
 });

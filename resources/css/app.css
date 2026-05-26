@@ -141,3 +141,14 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Shiki dual-theme: light/dark mode via CSS variables */
+.shiki,
+.shiki span {
+    color: var(--shiki-light);
+}
+
+.dark .shiki,
+.dark .shiki span {
+    color: var(--shiki-dark);
+}

@@ -16,6 +16,7 @@ import {
     CornerDownLeft,
     Download,
     PencilLine,
+    RotateCcw,
     Sparkles,
     Undo2,
 } from 'lucide-react';
@@ -62,6 +63,7 @@ type InboxItem = {
     sourceType: string;
     status: string;
     summary: string | null;
+    tags: string[];
     occurredAt: string | null;
     latestBackup: {
         createdAt: string;
@@ -96,6 +98,9 @@ type DashboardProps = {
     };
     selectedScrap: InboxItem | null;
     relatedScraps: RelatedScrap[];
+    availableTags: string[];
+    activeTag: string | null;
+    activeStatus: 'active' | 'archived';
 };
 
 type SuggestedMetadata = {
@@ -186,6 +191,9 @@ export default function Dashboard({
     inboxItems,
     selectedScrap: initialSelectedScrap,
     relatedScraps,
+    availableTags,
+    activeTag,
+    activeStatus,
 }: DashboardProps) {
     const { __ } = useLang();
     const [selectedScrap, setSelectedScrap] = useState<InboxItem | null>(
@@ -212,11 +220,65 @@ export default function Dashboard({
             slug: '',
         });
     const recentScraps = inboxItems.data;
+    const isArchivedView = activeStatus === 'archived';
+    const selectedScrapIsArchived = selectedScrap?.status === 'archived';
+
+    function routeQuery(
+        tag: string | null,
+        status: 'active' | 'archived' = activeStatus,
+    ): { tag?: string; status?: 'archived' } | undefined {
+        const query: { tag?: string; status?: 'archived' } = {};
+
+        if (tag) {
+query.tag = tag;
+}
+
+        if (status === 'archived') {
+query.status = 'archived';
+}
+
+        return Object.keys(query).length > 0 ? query : undefined;
+    }
+
+    function workspaceIndex(query?: {
+        tag?: string;
+        status?: 'archived';
+    }): ReturnType<typeof dashboard> {
+        return dashboard({ query });
+    }
+
+    function workspaceShow(
+        slug: string,
+        query?: { tag?: string; status?: 'archived' },
+    ): ReturnType<typeof dashboardShow> {
+        return dashboardShow(slug, { query });
+    }
+
+    function visitTag(tag: string | null): void {
+        router.visit(
+            selectedScrap?.slug
+                ? workspaceShow(selectedScrap.slug, routeQuery(tag))
+                : workspaceIndex(routeQuery(tag)),
+        );
+    }
+
+    function visitStatus(status: 'active' | 'archived'): void {
+        router.visit(
+            selectedScrap?.slug
+                ? workspaceShow(
+                      selectedScrap.slug,
+                      routeQuery(activeTag, status),
+                  )
+                : workspaceIndex(routeQuery(activeTag, status)),
+        );
+    }
 
     const sourceLabels: Record<string, string> = {
         daily_report: __('Daily report'),
+        execution: __('Execution result'),
         inquiry: __('Inquiry'),
         meeting_note: __('Meeting note'),
+        plan: __('Plan'),
         research: __('Research'),
     };
 
@@ -227,6 +289,7 @@ export default function Dashboard({
         completed: __('Completed'),
         processed: __('Processed'),
         failed: __('Failed'),
+        archived: __('Archived'),
     };
 
     setLayoutProps({
@@ -318,8 +381,14 @@ export default function Dashboard({
     /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
     function beginNewScrap(): void {
+        if (isArchivedView) {
+            router.visit(workspaceIndex(routeQuery(activeTag, 'active')));
+
+            return;
+        }
+
         if (initialSelectedScrap !== null) {
-            router.visit(dashboard());
+            router.visit(workspaceIndex(routeQuery(activeTag)));
 
             return;
         }
@@ -389,6 +458,16 @@ export default function Dashboard({
             onSuccess: () => {
                 beginNewScrap();
             },
+        });
+    }
+
+    function restoreSelectedScrap(): void {
+        if (!selectedScrap) {
+            return;
+        }
+
+        archiveForm.submit(ScrapController.restore(selectedScrap.id), {
+            preserveScroll: true,
         });
     }
 
@@ -820,8 +899,13 @@ export default function Dashboard({
                                             key={item.id}
                                             href={
                                                 item.slug
-                                                    ? dashboardShow(item.slug)
-                                                    : dashboard()
+                                                    ? workspaceShow(
+                                                          item.slug,
+                                                          routeQuery(activeTag),
+                                                      )
+                                                    : workspaceIndex(
+                                                          routeQuery(activeTag),
+                                                      )
                                             }
                                             prefetch
                                             onClick={() => {
@@ -868,6 +952,15 @@ export default function Dashboard({
                                                         item.sourceType
                                                     ] ?? item.sourceType}
                                                 </span>
+                                                {item.tags.map((tag) => (
+                                                    <Badge
+                                                        key={tag}
+                                                        variant="outline"
+                                                        className="text-[11px]"
+                                                    >
+                                                        #{tag}
+                                                    </Badge>
+                                                ))}
                                                 <span>•</span>
                                                 <span>
                                                     <DateDisplay
@@ -883,7 +976,63 @@ export default function Dashboard({
                     </SheetContent>
                 </Sheet>
 
-                <div className="grid gap-6 lg:grid-cols-[1.5fr_0.72fr]">
+                {/* Filter toolbar */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center rounded-lg bg-muted/50 p-0.5 text-sm">
+                        <button
+                            type="button"
+                            onClick={() => visitStatus('active')}
+                            className={`rounded-md px-3 py-1.5 transition-colors ${
+                                !isArchivedView
+                                    ? 'bg-foreground text-background'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            {__('Active')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => visitStatus('archived')}
+                            className={`rounded-md px-3 py-1.5 transition-colors ${
+                                isArchivedView
+                                    ? 'bg-foreground text-background'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            {__('Archived')}
+                        </button>
+                    </div>
+
+                    {availableTags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                size="sm"
+                                variant={
+                                    activeTag === null ? 'default' : 'outline'
+                                }
+                                onClick={() => visitTag(null)}
+                            >
+                                {__('All tags')}
+                            </Button>
+                            {availableTags.map((tag) => (
+                                <Button
+                                    key={tag}
+                                    size="sm"
+                                    variant={
+                                        activeTag === tag
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    onClick={() => visitTag(tag)}
+                                >
+                                    #{tag}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.72fr)]">
                     <Card className="border-sidebar-border/70 shadow-sm">
                         <CardHeader className="gap-3">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1318,52 +1467,70 @@ export default function Dashboard({
                                     )}
 
                                     <div className="flex items-center justify-end gap-4 border-t border-border/70 pt-4">
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    disabled={
-                                                        archiveForm.processing
-                                                    }
-                                                    className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                >
-                                                    <Archive className="size-4" />
-                                                    {__('Send to archive')}
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>
-                                                        {__('Send to archive?')}
-                                                    </DialogTitle>
-                                                    <DialogDescription>
-                                                        {__(
-                                                            'This scrap will be moved to the archive and removed from the inbox.',
-                                                        )}
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <DialogFooter>
-                                                    <DialogClose asChild>
-                                                        <Button variant="secondary">
-                                                            {__('Cancel')}
-                                                        </Button>
-                                                    </DialogClose>
+                                        {selectedScrapIsArchived ? (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                    archiveForm.processing
+                                                }
+                                                onClick={restoreSelectedScrap}
+                                            >
+                                                <RotateCcw className="size-4" />
+                                                {__('Restore')}
+                                            </Button>
+                                        ) : (
+                                            <Dialog>
+                                                <DialogTrigger asChild>
                                                     <Button
-                                                        variant="destructive"
+                                                        variant="ghost"
+                                                        size="sm"
                                                         disabled={
                                                             archiveForm.processing
                                                         }
-                                                        onClick={
-                                                            archiveSelectedScrap
-                                                        }
+                                                        className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                     >
                                                         <Archive className="size-4" />
                                                         {__('Send to archive')}
                                                     </Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>
+                                                            {__(
+                                                                'Send to archive?',
+                                                            )}
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            {__(
+                                                                'This scrap will be moved to the archive and removed from the inbox.',
+                                                            )}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <DialogFooter>
+                                                        <DialogClose asChild>
+                                                            <Button variant="secondary">
+                                                                {__('Cancel')}
+                                                            </Button>
+                                                        </DialogClose>
+                                                        <Button
+                                                            variant="destructive"
+                                                            disabled={
+                                                                archiveForm.processing
+                                                            }
+                                                            onClick={
+                                                                archiveSelectedScrap
+                                                            }
+                                                        >
+                                                            <Archive className="size-4" />
+                                                            {__(
+                                                                'Send to archive',
+                                                            )}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1663,10 +1830,17 @@ export default function Dashboard({
                                                     key={related.id}
                                                     href={
                                                         related.slug
-                                                            ? dashboardShow(
+                                                            ? workspaceShow(
                                                                   related.slug,
+                                                                  routeQuery(
+                                                                      activeTag,
+                                                                  ),
                                                               )
-                                                            : dashboard()
+                                                            : workspaceIndex(
+                                                                  routeQuery(
+                                                                      activeTag,
+                                                                  ),
+                                                              )
                                                     }
                                                     prefetch
                                                     className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
@@ -1734,10 +1908,17 @@ export default function Dashboard({
                                                         key={item.id}
                                                         href={
                                                             item.slug
-                                                                ? dashboardShow(
+                                                                ? workspaceShow(
                                                                       item.slug,
+                                                                      routeQuery(
+                                                                          activeTag,
+                                                                      ),
                                                                   )
-                                                                : dashboard()
+                                                                : workspaceIndex(
+                                                                      routeQuery(
+                                                                          activeTag,
+                                                                      ),
+                                                                  )
                                                         }
                                                         prefetch
                                                         onClick={() => {
@@ -1786,6 +1967,19 @@ export default function Dashboard({
                                                                 ] ??
                                                                     item.sourceType}
                                                             </span>
+                                                            {item.tags.map(
+                                                                (tag) => (
+                                                                    <Badge
+                                                                        key={
+                                                                            tag
+                                                                        }
+                                                                        variant="outline"
+                                                                        className="text-[11px]"
+                                                                    >
+                                                                        #{tag}
+                                                                    </Badge>
+                                                                ),
+                                                            )}
                                                             <span>•</span>
                                                             <span>
                                                                 <DateDisplay
@@ -1866,7 +2060,10 @@ function DateDisplay({ value }: { value: string | null }) {
             return;
         }
 
-        const id = setInterval(() => setRefreshTick((tick) => tick + 1), 60_000);
+        const id = setInterval(
+            () => setRefreshTick((tick) => tick + 1),
+            60_000,
+        );
 
         return () => clearInterval(id);
     }, [value]);

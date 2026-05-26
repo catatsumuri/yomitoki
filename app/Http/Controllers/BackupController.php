@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Scrap;
 use FilesystemIterator;
+use Generator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\StreamedEvent;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use ZipArchive;
 
 class BackupController extends Controller
@@ -22,46 +25,8 @@ class BackupController extends Controller
 
         $description = $request->string('description')->trim()->value();
 
-        $zipPath = tempnam(sys_get_temp_dir(), 'yomitoki-scrap-');
-        $zip = new ZipArchive;
-        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-
-        $this->addScrapToZip($zip, $scrap, '');
-        $this->addReferencedImages($zip, $scrap, $request->user()->id);
-
-        foreach ($scrap->children as $child) {
-            $this->addScrapToZip($zip, $child, 'children/');
-            $this->addReferencedImages($zip, $child, $request->user()->id);
-        }
-
-        if ($description !== '') {
-            $info = implode("\n", array_filter([
-                'Scrap: '.($scrap->title ?? $scrap->slug ?? $scrap->id),
-                'Created: '.now()->toIso8601String(),
-                '',
-                $description,
-            ]));
-            $zip->addFromString('info.txt', $info);
-            $zip->setArchiveComment($description);
-        }
-
-        $zip->close();
-
-        $filename = ($scrap->slug ?? $scrap->id).'-'.now()->format('Ymd-His').'.zip';
-        $storagePath = "backups/{$request->user()->id}/{$filename}";
-
-        Storage::put($storagePath, file_get_contents($zipPath));
-        unlink($zipPath);
-
-        $meta = [
-            'createdAt' => now()->toIso8601String(),
-            'description' => $description !== '' ? $description : null,
-            'scrapSlug' => $scrap->slug ?? (string) $scrap->id,
-        ];
-        Storage::put(
-            "backups/{$request->user()->id}/{$filename}.meta.json",
-            json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-        );
+        $scrap->loadMissing('children');
+        $this->createAndStoreBackupZip($scrap, $request->user()->id, $description);
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -69,6 +34,66 @@ class BackupController extends Controller
         ]);
 
         return back();
+    }
+
+    /**
+     * Stream bulk backup progress as Server-Sent Events.
+     *
+     * GET /backup/bulk-stream?ids[]=1&ids[]=2
+     */
+    public function bulkStream(Request $request): StreamedResponse
+    {
+        $ids = array_values(array_filter(array_map('intval', $request->array('ids'))));
+        $user = $request->user();
+
+        $scraps = Scrap::query()
+            ->where('user_id', $user->id)
+            ->whereIn('id', $ids)
+            ->whereNull('parent_id')
+            ->with('children')
+            ->get();
+
+        return response()->eventStream(function () use ($scraps, $user): Generator {
+            $succeeded = 0;
+            $failed = 0;
+
+            foreach ($scraps as $scrap) {
+                try {
+                    $filename = $this->createAndStoreBackupZip($scrap, $user->id, '');
+                    $succeeded++;
+
+                    yield new StreamedEvent(
+                        event: 'progress',
+                        data: json_encode([
+                            'scrapId' => $scrap->id,
+                            'title' => $scrap->title ?? $scrap->slug,
+                            'status' => 'done',
+                            'filename' => $filename,
+                        ], JSON_UNESCAPED_UNICODE),
+                    );
+                } catch (\Throwable) {
+                    $failed++;
+
+                    yield new StreamedEvent(
+                        event: 'progress',
+                        data: json_encode([
+                            'scrapId' => $scrap->id,
+                            'title' => $scrap->title ?? $scrap->slug,
+                            'status' => 'failed',
+                        ], JSON_UNESCAPED_UNICODE),
+                    );
+                }
+            }
+
+            yield new StreamedEvent(
+                event: 'complete',
+                data: json_encode([
+                    'total' => $scraps->count(),
+                    'succeeded' => $succeeded,
+                    'failed' => $failed,
+                ]),
+            );
+        });
     }
 
     public function download(Request $request): BinaryFileResponse
@@ -98,6 +123,55 @@ class BackupController extends Controller
         return response()
             ->download($zipPath, 'yomitoki-backup.zip', ['Content-Type' => 'application/zip'])
             ->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Build, store, and return the zip filename for a single scrap backup.
+     */
+    private function createAndStoreBackupZip(Scrap $scrap, int $userId, string $description): string
+    {
+        $zipPath = tempnam(sys_get_temp_dir(), 'yomitoki-scrap-');
+        $zip = new ZipArchive;
+        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        $this->addScrapToZip($zip, $scrap, '');
+        $this->addReferencedImages($zip, $scrap, $userId);
+
+        foreach ($scrap->children as $child) {
+            $this->addScrapToZip($zip, $child, 'children/');
+            $this->addReferencedImages($zip, $child, $userId);
+        }
+
+        if ($description !== '') {
+            $info = implode("\n", array_filter([
+                'Scrap: '.($scrap->title ?? $scrap->slug ?? $scrap->id),
+                'Created: '.now()->toIso8601String(),
+                '',
+                $description,
+            ]));
+            $zip->addFromString('info.txt', $info);
+            $zip->setArchiveComment($description);
+        }
+
+        $zip->close();
+
+        $filename = ($scrap->slug ?? $scrap->id).'-'.now()->format('Ymd-His').'.zip';
+        $storagePath = "backups/{$userId}/{$filename}";
+
+        Storage::put($storagePath, file_get_contents($zipPath));
+        unlink($zipPath);
+
+        $meta = [
+            'createdAt' => now()->toIso8601String(),
+            'description' => $description !== '' ? $description : null,
+            'scrapSlug' => $scrap->slug ?? (string) $scrap->id,
+        ];
+        Storage::put(
+            "backups/{$userId}/{$filename}.meta.json",
+            json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+        );
+
+        return $filename;
     }
 
     private function addScrapToZip(ZipArchive $zip, Scrap $scrap, string $prefix): void

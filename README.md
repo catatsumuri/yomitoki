@@ -1,27 +1,83 @@
-# Laravel + React Starter Kit
+# Yomitoki
 
-## Introduction
+AIエージェント（Claude Code など）が生成したプランを収集・閲覧するための個人用ダッシュボード。
 
-Our React starter kit provides a robust, modern starting point for building Laravel applications with a React frontend using [Inertia](https://inertiajs.com).
+エージェントが `/plan` を実行するたびにプランが自動で流れ込み、すべての意思決定の記録が一箇所に集まる。
 
-Inertia allows you to build modern, single-page React applications using classic server-side routing and controllers. This lets you enjoy the frontend power of React combined with the incredible backend productivity of Laravel and lightning-fast Vite compilation.
+## コンセプト
 
-This React starter kit utilizes React 19, TypeScript, Tailwind, and the [shadcn/ui](https://ui.shadcn.com) and [radix-ui](https://www.radix-ui.com) component libraries.
+AIと作業していると、プランは承認されたあと消えていく。何を考えて、何を決めたかの文脈が残らない。
 
-## Official Documentation
+Yomitoki はその流れを受け止める場所。プランをインボックスに貯め、あとから読み返せるようにする。
 
-Documentation for all Laravel starter kits can be found on the [Laravel website](https://laravel.com/docs/starter-kits).
+## 仕組み
 
-## Contributing
+Claude Code の `plan-to-markdown` スキルがプランモード終了後に自動実行され、プランの Markdown をそのままデータベースへ投入する。フロントエンドのインボックスに `source_type: plan` として流れ込み、他のメモや記録と並んで表示される。
 
-Thank you for considering contributing to our starter kit! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```
+/plan → ExitPlanMode → save-plan.sh → plans:save → scraps テーブル → ダッシュボード
+```
 
-All contributions to the Starter Kits from now on should be made through [Maestro](https://github.com/laravel/maestro).
+## ロードマップ
 
-## Code of Conduct
+### Phase 1 — ローカル収集（現在）
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+このリポジトリ自身のプランを収集する。Claude Code の `plan-to-markdown` スキルがプランモード終了後に自動実行され、プランの Markdown をそのままデータベースへ投入する。
 
-## License
+```
+/plan → ExitPlanMode → save-plan.sh → plans:save → scraps テーブル → ダッシュボード
+```
 
-The Laravel + React starter kit is open-sourced software licensed under the MIT license.
+### Phase 2 — マルチプロジェクト収集（構想）
+
+API エンドポイントとスキルの組み合わせで、別リポジトリ・別マシンのプランも収集できるようにする。他プロジェクトの `.env` に `YOMITOKI_URL` と `YOMITOKI_TOKEN` を置くだけでスキルが Yomitoki へ POST する構成。
+
+```
+別プロジェクトの /plan
+  → save-plan.sh
+      └─ curl POST /api/plans ──→ Yomitoki
+           { title, content,         └─ meta.project で識別
+             project, token }
+```
+
+## セットアップ
+
+```bash
+cp .env.example .env
+vendor/bin/sail up -d
+vendor/bin/sail artisan migrate
+vendor/bin/sail artisan db:seed
+vendor/bin/sail npm run build
+```
+
+## Claude Code 連携
+
+### スキル（このプロジェクト用）
+
+`.claude/skills/plan-to-markdown/` にスキルが入っている。プランが承認されたら即座に実行する：
+
+```bash
+bash .claude/skills/plan-to-markdown/scripts/save-plan.sh "feature-slug"
+```
+
+スキルは Claude が「実行すべき」と判断して初めて動く。確実に自動化したい場合はフックが必要。
+
+### フック（配布・自動化用）
+
+`PostToolUse` フックを `~/.claude/settings.json` に追加すると、`ExitPlanMode` のたびに自動実行される。スキルと違い Claude が忘れることがない。
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "ExitPlanMode",
+      "hooks": [{
+        "type": "command",
+        "command": "bash /path/to/save-plan.sh \"plan\" \"$CLAUDE_PROJECT_DIR\""
+      }]
+    }]
+  }
+}
+```
+
+Phase 2 の API 実装後は、フック＋スキルをセットにしたプラグインとして配布する想定。

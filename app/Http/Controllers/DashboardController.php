@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Scrap;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +21,7 @@ class DashboardController extends Controller
      */
     public function index(Request $request): Response
     {
-        return $this->renderDashboard($request->user(), null);
+        return $this->renderDashboard($request, $request->user(), null);
     }
 
     /**
@@ -26,21 +29,45 @@ class DashboardController extends Controller
      */
     public function show(Request $request, string $slug): Response
     {
+        return $this->showWorkspaceScrap($request, $slug);
+    }
+
+    private function showWorkspaceScrap(Request $request, string $slug): Response
+    {
+        $tag = $request->string('tag')->trim()->value();
+        $status = $this->resolveStatusFilter($request);
         $selectedScrap = Scrap::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('parent_id')
-            ->where('status', '!=', 'archived')
+            ->when(
+                $status === 'archived',
+                fn (EloquentBuilder $query) => $query->where('status', 'archived'),
+                fn (EloquentBuilder $query) => $query->where('status', '!=', 'archived'),
+            )
             ->where('slug', $slug)
+            ->when($tag !== '', fn (EloquentBuilder $query) => $this->applyTagFilter($query, $tag))
             ->with(['children' => fn ($query) => $query
-                ->where('status', '!=', 'archived')
+                ->when(
+                    $status === 'archived',
+                    fn (EloquentBuilder $childQuery) => $childQuery->where('status', 'archived'),
+                    fn (EloquentBuilder $childQuery) => $childQuery->where('status', '!=', 'archived'),
+                )
                 ->orderBy('occurred_at')
                 ->orderBy('id')])
             ->firstOrFail();
 
-        $relatedScraps = $selectedScrap->relatedScraps();
+        $relatedScraps = $status === 'active'
+            ? $selectedScrap->relatedScraps()
+            : collect();
         $latestBackup = $this->findLatestBackup($request->user()->id, $selectedScrap->slug ?? (string) $selectedScrap->id);
 
-        return $this->renderDashboard($request->user(), $selectedScrap, $relatedScraps, $latestBackup);
+        return $this->renderDashboard(
+            $request,
+            $request->user(),
+            $selectedScrap,
+            $relatedScraps,
+            $latestBackup,
+        );
     }
 
     /**
@@ -72,45 +99,65 @@ class DashboardController extends Controller
      * @param  Collection<int, array<string, mixed>>|null  $relatedScraps
      * @param  array<string, mixed>|null  $latestBackup
      */
-    private function renderDashboard(User $user, ?Scrap $selectedScrap, ?Collection $relatedScraps = null, ?array $latestBackup = null): Response
-    {
-        $scrapQuery = DB::table('scraps')
-            ->where('user_id', $user->id)
-            ->where('status', '!=', 'archived');
-        $documentQuery = DB::table('documents')->where('user_id', $user->id);
-        $aiRunQuery = DB::table('ai_runs')->where('user_id', $user->id);
-
-        $inboxItems = Inertia::scroll(fn () => Scrap::query()
-            ->where('user_id', $user->id)
-            ->whereNull('parent_id')
-            ->where('status', '!=', 'archived')
-            ->with(['children' => fn ($query) => $query
-                ->where('status', '!=', 'archived')
-                ->orderBy('occurred_at')
-                ->orderBy('id')])
+    private function renderDashboard(
+        Request $request,
+        User $user,
+        ?Scrap $selectedScrap,
+        ?Collection $relatedScraps = null,
+        ?array $latestBackup = null,
+    ): Response {
+        $tag = $request->string('tag')->trim()->value();
+        $status = $this->resolveStatusFilter($request);
+        $scrapQuery = $this->applyStatusFilter(
+            DB::table('scraps')
+                ->where('user_id', $user->id),
+            $status,
+        );
+        $filteredScrapQuery = $this->applyTagFilter(clone $scrapQuery, $tag);
+        $topLevelScrapQuery = $this->applyStatusFilter(
+            Scrap::query()
+                ->where('user_id', $user->id)
+                ->whereNull('parent_id'),
+            $status,
+        );
+        $selectedScrap = $selectedScrap?->status === 'archived' && $status === 'active'
+            ? null
+            : $selectedScrap;
+        $inboxItems = Inertia::scroll(fn () => $this->applyTagFilter(
+            $topLevelScrapQuery
+                ->with(['children' => fn ($query) => $this->applyStatusFilter($query, $status)
+                    ->orderBy('occurred_at')
+                    ->orderBy('id')]),
+            $tag,
+        )
             ->latest('occurred_at')
             ->paginate(5, pageName: 'scraps')
             ->through(fn (Scrap $scrap) => $this->mapScrapForDashboard($scrap)));
+        $documentQuery = DB::table('documents')->where('user_id', $user->id);
+        $aiRunQuery = DB::table('ai_runs')->where('user_id', $user->id);
+        $availableTags = $this->availableTagsForUser($user->id, $status);
 
-        $needsAttention = (clone $scrapQuery)
-            ->select(['id', 'title', 'source_type', 'summary', 'status', 'extracted_data', 'occurred_at'])
-            ->where('status', 'raw')
-            ->latest('occurred_at')
-            ->limit(4)
-            ->get()
-            ->map(function (object $scrap): array {
-                $extractedData = json_decode((string) $scrap->extracted_data, true);
+        $needsAttention = $status === 'active'
+            ? (clone $filteredScrapQuery)
+                ->select(['id', 'title', 'source_type', 'summary', 'status', 'extracted_data', 'occurred_at'])
+                ->where('status', 'raw')
+                ->latest('occurred_at')
+                ->limit(4)
+                ->get()
+                ->map(function (object $scrap): array {
+                    $extractedData = json_decode((string) $scrap->extracted_data, true);
 
-                return [
-                    'id' => $scrap->id,
-                    'title' => $scrap->title,
-                    'sourceType' => $scrap->source_type,
-                    'summary' => $scrap->summary,
-                    'status' => $scrap->status,
-                    'priority' => $extractedData['priority'] ?? null,
-                    'occurredAt' => $scrap->occurred_at,
-                ];
-            });
+                    return [
+                        'id' => $scrap->id,
+                        'title' => $scrap->title,
+                        'sourceType' => $scrap->source_type,
+                        'summary' => $scrap->summary,
+                        'status' => $scrap->status,
+                        'priority' => $extractedData['priority'] ?? null,
+                        'occurredAt' => $scrap->occurred_at,
+                    ];
+                })
+            : collect();
 
         $recentDocuments = (clone $documentQuery)
             ->select(['id', 'title', 'document_type', 'status', 'summary', 'updated_at'])
@@ -154,12 +201,19 @@ class DashboardController extends Controller
 
         return Inertia::render('dashboard', [
             'summary' => [
-                'inboxCount' => (clone $scrapQuery)->where('status', 'raw')->count(),
-                'attentionCount' => (clone $scrapQuery)->where('status', 'raw')->count(),
+                'inboxCount' => $status === 'active'
+                    ? (clone $filteredScrapQuery)->where('status', 'raw')->count()
+                    : (clone $filteredScrapQuery)->whereNull('parent_id')->count(),
+                'attentionCount' => $status === 'active'
+                    ? (clone $filteredScrapQuery)->where('status', 'raw')->count()
+                    : 0,
                 'documentCount' => (clone $documentQuery)->count(),
                 'runningAiCount' => (clone $aiRunQuery)->whereIn('status', ['queued', 'running'])->count(),
             ],
             'inboxItems' => $inboxItems,
+            'availableTags' => $availableTags,
+            'activeTag' => $tag !== '' ? $tag : null,
+            'activeStatus' => $status,
             'selectedScrap' => $selectedScrap
                 ? array_merge($this->mapScrapForDashboard($selectedScrap), ['latestBackup' => $latestBackup])
                 : null,
@@ -178,6 +232,8 @@ class DashboardController extends Controller
      */
     private function mapScrapForDashboard(Scrap $scrap): array
     {
+        $meta = is_array($scrap->meta) ? $scrap->meta : [];
+
         return [
             'id' => $scrap->id,
             'parentId' => $scrap->parent_id,
@@ -187,6 +243,10 @@ class DashboardController extends Controller
             'sourceType' => $scrap->source_type,
             'status' => $scrap->status,
             'summary' => $scrap->summary,
+            'tags' => collect($meta['tags'] ?? [])
+                ->filter(fn (mixed $tag) => is_string($tag) && $tag !== '')
+                ->values()
+                ->all(),
             'occurredAt' => $scrap->occurred_at?->toIso8601String(),
             'children' => $scrap->children->map(fn (Scrap $child) => [
                 'id' => $child->id,
@@ -198,5 +258,59 @@ class DashboardController extends Controller
                 'occurredAt' => $child->occurred_at?->toIso8601String(),
             ])->values()->all(),
         ];
+    }
+
+    private function applyTagFilter(QueryBuilder|EloquentBuilder $query, string $tag): QueryBuilder|EloquentBuilder
+    {
+        if ($tag === '') {
+            return $query;
+        }
+
+        return $query->whereRaw("jsonb_exists(coalesce(meta::jsonb -> 'tags', '[]'::jsonb), ?)", [$tag]);
+    }
+
+    private function applyStatusFilter(QueryBuilder|EloquentBuilder|HasMany $query, string $status): QueryBuilder|EloquentBuilder|HasMany
+    {
+        if ($status === 'archived') {
+            return $query->where('status', 'archived');
+        }
+
+        return $query->where('status', '!=', 'archived');
+    }
+
+    private function resolveStatusFilter(Request $request): string
+    {
+        return $request->string('status')->value() === 'archived'
+            ? 'archived'
+            : 'active';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function availableTagsForUser(int $userId, string $status): array
+    {
+        return $this->applyStatusFilter(
+            DB::table('scraps')
+                ->where('user_id', $userId)
+                ->whereNull('parent_id'),
+            $status,
+        )
+            ->whereNotNull('meta')
+            ->pluck('meta')
+            ->flatMap(function (mixed $meta): array {
+                $decoded = json_decode((string) $meta, true);
+                $tags = $decoded['tags'] ?? [];
+
+                if (! is_array($tags)) {
+                    return [];
+                }
+
+                return array_values(array_filter($tags, fn (mixed $tag) => is_string($tag) && $tag !== ''));
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 }
