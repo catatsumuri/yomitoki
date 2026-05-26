@@ -266,7 +266,7 @@ class DashboardController extends Controller
             return $query;
         }
 
-        return $query->whereRaw("jsonb_exists(coalesce(meta::jsonb -> 'tags', '[]'::jsonb), ?)", [$tag]);
+        return $query->whereJsonContains('meta->tags', $tag);
     }
 
     private function applyStatusFilter(QueryBuilder|EloquentBuilder|HasMany $query, string $status): QueryBuilder|EloquentBuilder|HasMany
