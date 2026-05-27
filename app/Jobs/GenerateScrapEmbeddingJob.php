@@ -13,6 +13,11 @@ class GenerateScrapEmbeddingJob implements ShouldQueue
 
     public function __construct(public readonly int $scrapId) {}
 
+    private function stripCodeBlocks(string $content): string
+    {
+        return trim(preg_replace('/```[\s\S]*?```/m', '', $content));
+    }
+
     public function handle(): void
     {
         $scrap = Scrap::find($this->scrapId);
@@ -21,9 +26,13 @@ class GenerateScrapEmbeddingJob implements ShouldQueue
             return;
         }
 
+        $body = $scrap->summary
+            ? $scrap->summary
+            : $this->stripCodeBlocks($scrap->content ?? '');
+
         $text = implode("\n\n", array_filter([
             $scrap->title,
-            $scrap->content,
+            $body,
         ]));
 
         $response = Embeddings::for([$text])->generate();

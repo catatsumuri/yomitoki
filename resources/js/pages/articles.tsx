@@ -78,32 +78,36 @@ function toneForStatus(
     status: string,
 ): 'default' | 'secondary' | 'outline' | 'destructive' {
     if (status === 'failed') {
-return 'destructive';
-}
+        return 'destructive';
+    }
 
     if (status === 'raw' || status === 'queued') {
-return 'secondary';
-}
+        return 'secondary';
+    }
 
-    if (status === 'final' || status === 'completed' || status === 'processed') {
-return 'default';
-}
+    if (
+        status === 'final' ||
+        status === 'completed' ||
+        status === 'processed'
+    ) {
+        return 'default';
+    }
 
     return 'outline';
 }
 
 function formatFileSize(bytes: number): string {
     if (bytes === 0) {
-return '—';
-}
+        return '—';
+    }
 
     if (bytes < 1024) {
-return `${bytes} B`;
-}
+        return `${bytes} B`;
+    }
 
     if (bytes < 1024 * 1024) {
-return `${(bytes / 1024).toFixed(1)} KB`;
-}
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
 
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -142,7 +146,7 @@ export default function Articles({
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setCheckedIds(new Set());
-         
+
         setBulkBackup({ phase: 'idle' });
         sseRef.current?.close();
     }, [activeStatus, activeTag]);
@@ -188,12 +192,12 @@ export default function Articles({
         const query: { tag?: string; status?: 'archived' } = {};
 
         if (tag) {
-query.tag = tag;
-}
+            query.tag = tag;
+        }
 
         if (status === 'archived') {
-query.status = 'archived';
-}
+            query.status = 'archived';
+        }
 
         return Object.keys(query).length > 0 ? query : undefined;
     }
@@ -232,8 +236,8 @@ query.status = 'archived';
         const ids = [...checkedIds];
 
         if (ids.length === 0 || isArchiving) {
-return;
-}
+            return;
+        }
 
         setIsArchiving(true);
         router.post(
@@ -247,8 +251,8 @@ return;
         const ids = [...checkedIds];
 
         if (ids.length === 0 || isGenerating) {
-return;
-}
+            return;
+        }
 
         setIsGenerating(true);
         router.post(
@@ -262,8 +266,8 @@ return;
         const ids = [...checkedIds];
 
         if (ids.length === 0) {
-return;
-}
+            return;
+        }
 
         // Build initial items list from current scraps data
         const items: BulkBackupItem[] = ids.map((id) => {
@@ -294,8 +298,8 @@ return;
             };
             setBulkBackup((prev) => {
                 if (prev.phase !== 'running') {
-return prev;
-}
+                    return prev;
+                }
 
                 return {
                     ...prev,
@@ -322,8 +326,8 @@ return prev;
             sseRef.current = null;
             setBulkBackup((prev) => {
                 if (prev.phase !== 'running') {
-return prev;
-}
+                    return prev;
+                }
 
                 return {
                     phase: 'done',
@@ -643,8 +647,8 @@ return prev;
                             checked={allChecked}
                             ref={(el) => {
                                 if (el) {
-el.indeterminate = someChecked;
-}
+                                    el.indeterminate = someChecked;
+                                }
                             }}
                             onChange={toggleAll}
                             className="size-4 cursor-pointer rounded border-border accent-foreground"

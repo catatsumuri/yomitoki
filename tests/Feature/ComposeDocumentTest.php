@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\ComposeDocumentJob;
-use App\Models\AiRun;
 use App\Models\Scrap;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

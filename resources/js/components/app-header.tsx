@@ -1,9 +1,10 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Link, usePage } from '@inertiajs/react';
-import { FileText, LayoutGrid, Menu, Search } from 'lucide-react';
+import { FileText, LayoutGrid, Menu } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { SearchDialog } from '@/components/search-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -149,13 +150,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     </div>
 
                     <div className="ml-auto flex items-center space-x-2">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="group h-9 w-9 cursor-pointer"
-                        >
-                            <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                        </Button>
+                        <SearchDialog />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

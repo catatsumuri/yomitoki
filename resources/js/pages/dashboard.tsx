@@ -230,12 +230,12 @@ export default function Dashboard({
         const query: { tag?: string; status?: 'archived' } = {};
 
         if (tag) {
-query.tag = tag;
-}
+            query.tag = tag;
+        }
 
         if (status === 'archived') {
-query.status = 'archived';
-}
+            query.status = 'archived';
+        }
 
         return Object.keys(query).length > 0 ? query : undefined;
     }

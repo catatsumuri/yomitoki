@@ -75,7 +75,7 @@ function renderInlineMarkdown(text: string): React.ReactNode {
         } else if (token.startsWith('**') && token.endsWith('**')) {
             fragments.push(
                 <strong key={`strong-${match.index}`}>
-                    {token.slice(2, -2)}
+                    {renderInlineMarkdown(token.slice(2, -2))}
                 </strong>,
             );
         } else {

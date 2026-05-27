@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\ScrapController;
+use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
@@ -29,6 +30,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('articles', [ArticlesController::class, 'index'])->name('articles');
     Route::get('articles/{slug}', [ArticlesController::class, 'show'])->name('articles.show');
     Route::post('documents/compose', [DocumentController::class, 'compose'])->name('documents.compose');
+    Route::get('search', [SearchController::class, 'index'])->name('search');
+    Route::post('search/init', [SearchController::class, 'init'])->name('search.init');
+    Route::post('search/query', [SearchController::class, 'query'])->name('search.query');
 });
 
 Route::get('images/{path}', [ImageController::class, 'show'])

@@ -37,6 +37,69 @@ test('job does nothing when scrap does not exist', function () {
     Embeddings::assertNothingGenerated();
 });
 
+test('job uses summary instead of content when summary is present', function () {
+    Embeddings::fake([
+        [Embeddings::fakeEmbedding(1024)],
+    ]);
+
+    $user = User::factory()->create();
+    $scrap = Scrap::factory()->create([
+        'user_id' => $user->id,
+        'title' => 'Test scrap',
+        'summary' => 'AI が生成した日本語の要約です。',
+        'content' => "説明文\n\n```ts\nconst x = 1;\n```\n\nさらに説明",
+    ]);
+
+    GenerateScrapEmbeddingJob::dispatchSync($scrap->id);
+
+    $scrap->refresh();
+
+    expect($scrap->embedding)->not->toBeNull();
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+});
+
+test('job strips code blocks from content when no summary', function () {
+    Embeddings::fake([
+        [Embeddings::fakeEmbedding(1024)],
+    ]);
+
+    $user = User::factory()->create();
+    $scrap = Scrap::factory()->create([
+        'user_id' => $user->id,
+        'title' => 'Test scrap',
+        'summary' => null,
+        'content' => "説明文\n\n```ts\nconst x = 1;\n```\n\nさらに説明",
+    ]);
+
+    GenerateScrapEmbeddingJob::dispatchSync($scrap->id);
+
+    $scrap->refresh();
+
+    expect($scrap->embedding)->not->toBeNull();
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+});
+
+test('job uses content directly when no summary and no code blocks', function () {
+    Embeddings::fake([
+        [Embeddings::fakeEmbedding(1024)],
+    ]);
+
+    $user = User::factory()->create();
+    $scrap = Scrap::factory()->create([
+        'user_id' => $user->id,
+        'title' => 'Test scrap',
+        'summary' => null,
+        'content' => '純粋な日本語のメモです。コードブロックは含まれていません。',
+    ]);
+
+    GenerateScrapEmbeddingJob::dispatchSync($scrap->id);
+
+    $scrap->refresh();
+
+    expect($scrap->embedding)->not->toBeNull();
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+});
+
 test('store scrap dispatches embedding job', function () {
     $user = User::factory()->create();
 
