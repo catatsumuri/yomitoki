@@ -20,10 +20,11 @@ import {
     Sparkles,
     Undo2,
 } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import InputError from '@/components/input-error';
+import { MarkdownPreview } from '@/components/markdown-preview';
 import { ScrapCard } from '@/components/scrap-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,6 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toneForStatus } from '@/lib/scrap-utils';
 import { dashboard } from '@/routes';
 import { show as dashboardShow } from '@/routes/dashboard';
 
@@ -260,16 +260,6 @@ export default function Dashboard({
         meeting_note: __('Meeting note'),
         plan: __('Plan'),
         research: __('Research'),
-    };
-
-    const statusLabels: Record<string, string> = {
-        raw: __('Raw'),
-        queued: __('Queued'),
-        final: __('Final'),
-        completed: __('Completed'),
-        processed: __('Processed'),
-        failed: __('Failed'),
-        archived: __('Archived'),
     };
 
     setLayoutProps({
@@ -900,9 +890,6 @@ export default function Dashboard({
                                                     : undefined
                                             }
                                             compact
-                                            statusLabel={
-                                                statusLabels[item.status]
-                                            }
                                             sourceLabel={
                                                 sourceLabels[item.sourceType]
                                             }
@@ -1073,15 +1060,6 @@ export default function Dashboard({
                                 <div className="space-y-6">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge
-                                                variant={toneForStatus(
-                                                    selectedScrap.status,
-                                                )}
-                                            >
-                                                {statusLabels[
-                                                    selectedScrap.status
-                                                ] ?? selectedScrap.status}
-                                            </Badge>
                                             <Badge variant="outline">
                                                 {sourceLabels[
                                                     selectedScrap.sourceType
@@ -1366,17 +1344,6 @@ export default function Dashboard({
                                                                             )}
                                                                     </p>
                                                                 </div>
-                                                                <Badge
-                                                                    variant={toneForStatus(
-                                                                        child.status,
-                                                                    )}
-                                                                >
-                                                                    {statusLabels[
-                                                                        child
-                                                                            .status
-                                                                    ] ??
-                                                                        child.status}
-                                                                </Badge>
                                                             </div>
                                                             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                                                                 <span>
@@ -1475,15 +1442,6 @@ export default function Dashboard({
                                 <>
                                     {selectedScrap && (
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge
-                                                variant={toneForStatus(
-                                                    selectedScrap.status,
-                                                )}
-                                            >
-                                                {statusLabels[
-                                                    selectedScrap.status
-                                                ] ?? selectedScrap.status}
-                                            </Badge>
                                             <Badge variant="outline">
                                                 {sourceLabels[
                                                     selectedScrap.sourceType
@@ -1839,11 +1797,6 @@ export default function Dashboard({
                                                             : undefined
                                                     }
                                                     compact
-                                                    statusLabel={
-                                                        statusLabels[
-                                                            item.status
-                                                        ]
-                                                    }
                                                     sourceLabel={
                                                         sourceLabels[
                                                             item.sourceType
@@ -1945,258 +1898,4 @@ function DateDisplay({ value }: { value: string | null }) {
             {` (${relativeLabel(value)})`}
         </>
     );
-}
-
-function MarkdownPreview({ content }: { content: string }) {
-    const lines = content.split('\n');
-    const nodes: React.ReactNode[] = [];
-    let listItems: string[] = [];
-    let orderedListItems: string[] = [];
-    let quoteLines: string[] = [];
-    let codeLines: string[] = [];
-    let inCodeBlock = false;
-
-    const flushList = (): void => {
-        if (listItems.length === 0) {
-            return;
-        }
-
-        nodes.push(
-            <ul
-                key={`list-${nodes.length}`}
-                className="list-disc space-y-1 pl-5"
-            >
-                {listItems.map((item, index) => (
-                    <li key={index}>{renderInlineMarkdown(item)}</li>
-                ))}
-            </ul>,
-        );
-
-        listItems = [];
-    };
-
-    const flushQuote = (): void => {
-        if (quoteLines.length === 0) {
-            return;
-        }
-
-        nodes.push(
-            <blockquote
-                key={`quote-${nodes.length}`}
-                className="border-l-2 border-border pl-4 text-muted-foreground"
-            >
-                {quoteLines.map((line, index) => (
-                    <p key={index}>{renderInlineMarkdown(line)}</p>
-                ))}
-            </blockquote>,
-        );
-
-        quoteLines = [];
-    };
-
-    const flushOrderedList = (): void => {
-        if (orderedListItems.length === 0) {
-            return;
-        }
-
-        nodes.push(
-            <ol
-                key={`ordered-list-${nodes.length}`}
-                className="list-decimal space-y-1 pl-5"
-            >
-                {orderedListItems.map((item, index) => (
-                    <li key={index}>{renderInlineMarkdown(item)}</li>
-                ))}
-            </ol>,
-        );
-
-        orderedListItems = [];
-    };
-
-    const flushCodeBlock = (): void => {
-        if (codeLines.length === 0) {
-            return;
-        }
-
-        nodes.push(
-            <pre
-                key={`code-${nodes.length}`}
-                className="overflow-x-auto rounded-xl bg-muted px-4 py-3 text-sm"
-            >
-                <code>{codeLines.join('\n')}</code>
-            </pre>,
-        );
-
-        codeLines = [];
-    };
-
-    for (const line of lines) {
-        if (line.trim().startsWith('```')) {
-            if (inCodeBlock) {
-                flushCodeBlock();
-                inCodeBlock = false;
-            } else {
-                flushList();
-                flushOrderedList();
-                flushQuote();
-                inCodeBlock = true;
-            }
-
-            continue;
-        }
-
-        if (inCodeBlock) {
-            codeLines.push(line);
-            continue;
-        }
-
-        if (line.startsWith('- ')) {
-            flushQuote();
-            flushOrderedList();
-            listItems.push(line.slice(2));
-            continue;
-        }
-
-        if (/^\d+\.\s/.test(line)) {
-            flushList();
-            flushQuote();
-            orderedListItems.push(line.replace(/^\d+\.\s/, ''));
-            continue;
-        }
-
-        if (line.startsWith('> ')) {
-            flushList();
-            flushOrderedList();
-            quoteLines.push(line.slice(2));
-            continue;
-        }
-
-        flushList();
-        flushOrderedList();
-        flushQuote();
-
-        if (line.trim() === '') {
-            nodes.push(<div key={`space-${nodes.length}`} className="h-2" />);
-            continue;
-        }
-
-        if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
-            nodes.push(
-                <hr key={`hr-${nodes.length}`} className="border-border/70" />,
-            );
-            continue;
-        }
-
-        if (line.startsWith('### ')) {
-            nodes.push(
-                <h3
-                    key={`h3-${nodes.length}`}
-                    className="text-lg font-semibold"
-                >
-                    {renderInlineMarkdown(line.slice(4))}
-                </h3>,
-            );
-            continue;
-        }
-
-        if (line.startsWith('## ')) {
-            nodes.push(
-                <h2
-                    key={`h2-${nodes.length}`}
-                    className="text-xl font-semibold"
-                >
-                    {renderInlineMarkdown(line.slice(3))}
-                </h2>,
-            );
-            continue;
-        }
-
-        if (line.startsWith('# ')) {
-            nodes.push(
-                <h1
-                    key={`h1-${nodes.length}`}
-                    className="text-2xl font-semibold"
-                >
-                    {renderInlineMarkdown(line.slice(2))}
-                </h1>,
-            );
-            continue;
-        }
-
-        nodes.push(
-            <p key={`p-${nodes.length}`} className="leading-7">
-                {renderInlineMarkdown(line)}
-            </p>,
-        );
-    }
-
-    flushList();
-    flushOrderedList();
-    flushQuote();
-    flushCodeBlock();
-
-    return <div className="space-y-3 text-sm text-foreground">{nodes}</div>;
-}
-
-function renderInlineMarkdown(text: string): React.ReactNode {
-    const fragments: React.ReactNode[] = [];
-    const pattern = /(`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    match = pattern.exec(text);
-
-    while (match !== null) {
-        if (match.index > lastIndex) {
-            fragments.push(text.slice(lastIndex, match.index));
-        }
-
-        const token = match[0];
-
-        if (token.startsWith('`') && token.endsWith('`')) {
-            fragments.push(
-                <code
-                    key={`code-${match.index}`}
-                    className="rounded bg-muted px-1 py-0.5 text-[0.9em]"
-                >
-                    {token.slice(1, -1)}
-                </code>,
-            );
-        } else if (token.startsWith('**') && token.endsWith('**')) {
-            fragments.push(
-                <strong key={`strong-${match.index}`}>
-                    {token.slice(2, -2)}
-                </strong>,
-            );
-        } else {
-            const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
-
-            if (linkMatch) {
-                fragments.push(
-                    <a
-                        key={`link-${match.index}`}
-                        href={linkMatch[2]}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline underline-offset-4"
-                    >
-                        {linkMatch[1]}
-                    </a>,
-                );
-            } else {
-                fragments.push(token);
-            }
-        }
-
-        lastIndex = match.index + token.length;
-        match = pattern.exec(text);
-    }
-
-    if (lastIndex < text.length) {
-        fragments.push(text.slice(lastIndex));
-    }
-
-    return fragments.map((fragment, index) => (
-        <Fragment key={index}>{fragment}</Fragment>
-    ));
 }

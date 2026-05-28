@@ -2,7 +2,6 @@ import { Link } from '@inertiajs/react';
 import type { InertiaLinkProps } from '@inertiajs/react';
 import { DateDisplay } from '@/components/date-display';
 import { Badge } from '@/components/ui/badge';
-import { toneForStatus } from '@/lib/scrap-utils';
 import { cn } from '@/lib/utils';
 
 export type ScrapCardItem = {
@@ -22,7 +21,6 @@ type ScrapCardProps = {
     onClick?: () => void;
     href?: NonNullable<InertiaLinkProps['href']>;
     compact?: boolean;
-    statusLabel?: string;
     sourceLabel?: string;
 };
 
@@ -32,11 +30,8 @@ export function ScrapCard({
     onClick,
     href,
     compact = false,
-    statusLabel,
     sourceLabel,
 }: ScrapCardProps) {
-    const statusVariant = toneForStatus(item.status);
-
     const inner = (
         <div className="relative">
             <div className="flex items-start justify-between gap-3">
@@ -58,16 +53,6 @@ export function ScrapCard({
                         {item.summary ?? 'まだサマリーがありません。'}
                     </p>
                 </div>
-                <Badge
-                    variant={statusVariant}
-                    className={cn(
-                        'shrink-0',
-                        statusVariant === 'default' &&
-                            'bg-primary/20 text-primary hover:bg-primary/30',
-                    )}
-                >
-                    {statusLabel ?? item.status}
-                </Badge>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

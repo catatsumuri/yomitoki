@@ -1,10 +1,10 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
+import AppLogoIcon from '@/components/app-logo-icon';
 import InputError from '@/components/input-error';
 import PasskeyVerify from '@/components/passkey-verify';
 import PasswordInput from '@/components/password-input';
-import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -12,14 +12,12 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { dashboard } from '@/routes';
 import { store } from '@/routes/login';
-import { request } from '@/routes/password';
 
 type Props = {
-    canResetPassword: boolean;
     status?: string;
 };
 
-export default function Welcome({ canResetPassword, status }: Props) {
+export default function Welcome({ status }: Props) {
     const { auth } = usePage().props;
     const { __ } = useLang();
 
@@ -177,17 +175,6 @@ export default function Welcome({ canResetPassword, status }: Props) {
                                                         <Label htmlFor="password">
                                                             {__('Password')}
                                                         </Label>
-                                                        {canResetPassword && (
-                                                            <Link
-                                                                href={request()}
-                                                                className="ml-auto text-xs text-primary underline-offset-4 hover:underline"
-                                                                tabIndex={5}
-                                                            >
-                                                                {__(
-                                                                    'Forgot your password?',
-                                                                )}
-                                                            </Link>
-                                                        )}
                                                     </div>
                                                     <PasswordInput
                                                         id="password"
@@ -255,8 +242,14 @@ export default function Welcome({ canResetPassword, status }: Props) {
                     </div>
                 </div>
 
-                <footer className="absolute bottom-4 left-8 text-xs text-muted-foreground">
-                    © 2025 YOMITOKI
+                <footer className="absolute bottom-4 left-8 z-10 text-xs text-muted-foreground">
+                    © 2026 Powered by{' '}
+                    <a
+                        href="https://github.com/catatsumuri/yomitoki"
+                        className="text-primary underline underline-offset-2 transition-opacity hover:opacity-70"
+                    >
+                        YOMITOKI
+                    </a>
                 </footer>
             </div>
         </>
