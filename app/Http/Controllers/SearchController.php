@@ -63,12 +63,18 @@ class SearchController extends Controller
         $query = $validated['query'];
         $conversationId = $validated['conversation_id'];
 
-        $relatedScraps = Scrap::query()
-            ->whereVectorSimilarTo('embedding', $query, 0.2)
+        $relatedScrapsQuery = Scrap::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('parent_id')
             ->where('status', '!=', 'archived')
-            ->whereNotNull('embedding')
+            ->whereNotNull('embedding');
+
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $relatedScrapsQuery->whereVectorSimilarTo('embedding', $query, 0.2);
+        }
+
+        $relatedScraps = $relatedScrapsQuery
+            ->latest()
             ->limit(5)
             ->get(['title', 'slug', 'summary', 'content_markdown']);
 
