@@ -8,9 +8,17 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\ScrapController;
 use App\Http\Controllers\SearchController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+use Laravel\Fortify\Features;
 
-Route::inertia('/', 'welcome')->name('home');
+Route::get('/', function (Request $request) {
+    return Inertia::render('welcome', [
+        'canResetPassword' => Features::enabled(Features::resetPasswords()),
+        'status' => $request->session()->get('status'),
+    ]);
+})->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('scraps/suggest-metadata', [ScrapController::class, 'suggestMetadata'])->name('scraps.suggest-metadata');
