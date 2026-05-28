@@ -6,12 +6,12 @@ export default function AppLogo() {
 
     return (
         <>
-            <AppLogoIcon className="size-8" />
-            <div className="ml-1 grid flex-1 text-left text-sm">
-                <span className="mb-0.5 truncate leading-tight font-semibold">
-                    {name}
-                </span>
+            <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-lg shadow-primary/20">
+                <AppLogoIcon className="size-5" />
             </div>
+            <span className="ml-2 hidden font-semibold text-foreground md:block">
+                {name}
+            </span>
         </>
     );
 }

@@ -30,19 +30,19 @@ export default function Welcome({ canResetPassword, status }: Props) {
                 {/* Floating accent blobs */}
                 <div className="pointer-events-none absolute inset-0 overflow-hidden">
                     <div
-                        className="absolute h-[600px] w-[600px] animate-pulse rounded-full opacity-15"
+                        className="absolute h-[600px] w-[600px] animate-pulse rounded-full opacity-20"
                         style={{
                             background:
-                                'radial-gradient(circle, hsl(var(--accent)) 0%, transparent 70%)',
+                                'radial-gradient(circle, oklch(0.65 0.18 200) 0%, transparent 70%)',
                             top: '-200px',
                             right: '-200px',
                         }}
                     />
                     <div
-                        className="absolute h-[400px] w-[400px] animate-pulse rounded-full opacity-[0.08]"
+                        className="absolute h-[400px] w-[400px] animate-pulse rounded-full opacity-10"
                         style={{
                             background:
-                                'radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%)',
+                                'radial-gradient(circle, oklch(0.55 0.2 200) 0%, transparent 70%)',
                             bottom: '-100px',
                             left: '-100px',
                         }}
@@ -54,17 +54,19 @@ export default function Welcome({ canResetPassword, status }: Props) {
                     <div className="flex flex-1 flex-col justify-center p-8 lg:p-16 xl:p-24">
                         {/* Logo + brand */}
                         <div className="relative mb-12">
-                            <div className="absolute -inset-8 rounded-full bg-accent/20 blur-3xl" />
+                            <div className="absolute -inset-8 rounded-full bg-primary/10 blur-3xl" />
                             <div className="relative flex items-center gap-6">
                                 <div className="relative">
-                                    <AppLogoIcon className="h-24 w-auto transition-transform duration-300 hover:scale-105 lg:h-32 xl:h-40" />
-                                    <div className="absolute -right-2 -bottom-2 h-8 w-8 rounded-lg bg-accent" />
+                                    <div className="flex size-24 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-xl shadow-primary/20 transition-transform duration-300 hover:scale-105 lg:size-32 xl:size-40">
+                                        <AppLogoIcon className="h-14 w-auto lg:h-20 xl:h-24" />
+                                    </div>
+                                    <div className="absolute -right-2 -bottom-2 h-8 w-8 rounded-lg bg-primary/30" />
                                 </div>
                                 <div>
                                     <h2 className="text-4xl font-black tracking-tight lg:text-5xl xl:text-6xl">
                                         YOMITOKI
                                     </h2>
-                                    <p className="mt-1 text-lg font-medium tracking-widest text-accent lg:text-xl">
+                                    <p className="mt-1 text-lg font-medium tracking-widest text-primary lg:text-xl">
                                         {__('Read deeply')}
                                     </p>
                                 </div>
@@ -75,7 +77,7 @@ export default function Welcome({ canResetPassword, status }: Props) {
                         <div className="max-w-2xl space-y-6">
                             <h1 className="text-5xl leading-[0.9] font-black tracking-tight lg:text-6xl xl:text-7xl">
                                 <span className="block">{__('AI plans,')}</span>
-                                <span className="block text-accent">
+                                <span className="block text-primary">
                                     {__('record,')}
                                 </span>
                                 <span className="block">
@@ -98,7 +100,7 @@ export default function Welcome({ canResetPassword, status }: Props) {
                             ].map((feature) => (
                                 <span
                                     key={feature}
-                                    className="cursor-default rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                                    className="cursor-default rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
                                 >
                                     {feature}
                                 </span>
@@ -107,7 +109,7 @@ export default function Welcome({ canResetPassword, status }: Props) {
                     </div>
 
                     {/* Right: Login panel */}
-                    <div className="flex w-full items-center justify-center border-b border-border bg-card p-8 lg:w-[480px] lg:border-b-0 lg:border-l lg:p-12 xl:w-[540px]">
+                    <div className="flex w-full items-center justify-center border-b border-border bg-card p-8 lg:w-[480px] lg:border-b-0 lg:border-l lg:border-primary/10 lg:p-12 xl:w-[540px]">
                         <div className="w-full max-w-sm">
                             {auth.user ? (
                                 <>
@@ -178,7 +180,7 @@ export default function Welcome({ canResetPassword, status }: Props) {
                                                         {canResetPassword && (
                                                             <Link
                                                                 href={request()}
-                                                                className="ml-auto text-xs text-accent underline-offset-4 hover:underline"
+                                                                className="ml-auto text-xs text-primary underline-offset-4 hover:underline"
                                                                 tabIndex={5}
                                                             >
                                                                 {__(

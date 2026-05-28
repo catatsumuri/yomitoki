@@ -262,7 +262,7 @@ export default function Documents({
                                 key={item.id}
                                 href={documentsShow(item.id)}
                                 prefetch
-                                className="block rounded-2xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/40"
+                                className="block rounded-2xl border border-border/50 bg-background/80 p-4 transition-all duration-200 hover:border-primary/20 hover:bg-card hover:shadow-lg hover:shadow-black/5"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">

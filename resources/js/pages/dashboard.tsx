@@ -24,6 +24,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import InputError from '@/components/input-error';
+import { ScrapCard } from '@/components/scrap-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,6 +52,8 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toneForStatus } from '@/lib/scrap-utils';
 import { dashboard } from '@/routes';
 import { show as dashboardShow } from '@/routes/dashboard';
 
@@ -107,28 +110,6 @@ type SuggestedMetadata = {
     title: string;
     slug: string;
 };
-
-function toneForStatus(
-    status: string,
-): 'default' | 'secondary' | 'outline' | 'destructive' {
-    if (status === 'failed') {
-        return 'destructive';
-    }
-
-    if (status === 'raw' || status === 'queued') {
-        return 'secondary';
-    }
-
-    if (
-        status === 'final' ||
-        status === 'completed' ||
-        status === 'processed'
-    ) {
-        return 'default';
-    }
-
-    return 'outline';
-}
 
 function buildFallbackTitle(content: string, currentTitle: string): string {
     const normalizedTitle = currentTitle.trim().replace(/\s+/g, ' ');
@@ -206,7 +187,6 @@ export default function Dashboard({
     const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
     const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
     const [backupDescription, setBackupDescription] = useState('');
-    const [isRecentScrapsOpen, setIsRecentScrapsOpen] = useState(true);
     const [rightPanelTab, setRightPanelTab] = useState<'recent' | 'similar'>(
         'recent',
     );
@@ -346,7 +326,7 @@ export default function Dashboard({
         setShowChildMetaFields(false);
         setIsSuggestionDialogOpen(false);
         setPendingOrganize(null);
-        setRightPanelTab(relatedScraps.length > 0 ? 'similar' : 'recent');
+        setRightPanelTab('recent');
         form.resetAndClearErrors();
     }, [initialSelectedScrap]);
 
@@ -860,7 +840,7 @@ export default function Dashboard({
                     <button
                         type="button"
                         onClick={() => setShowMobileRecent(true)}
-                        className="flex items-center justify-between rounded-2xl border border-sidebar-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground lg:hidden dark:border-sidebar-border dark:bg-muted/20"
+                        className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground lg:hidden"
                     >
                         <span>{__('Recent scraps')}</span>
                         <ChevronDown className="size-4 -rotate-90" />
@@ -893,82 +873,40 @@ export default function Dashboard({
                                     ) : null
                                 }
                             >
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {recentScraps.map((item) => (
-                                        <Link
+                                        <ScrapCard
                                             key={item.id}
+                                            item={item}
+                                            isSelected={
+                                                selectedScrap?.id === item.id
+                                            }
                                             href={
                                                 item.slug
                                                     ? workspaceShow(
                                                           item.slug,
                                                           routeQuery(activeTag),
                                                       )
-                                                    : workspaceIndex(
-                                                          routeQuery(activeTag),
-                                                      )
+                                                    : undefined
                                             }
-                                            prefetch
-                                            onClick={() => {
-                                                if (!item.slug) {
-                                                    openScrap(item);
-                                                }
-
-                                                setShowMobileRecent(false);
-                                            }}
-                                            className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
-                                                selectedScrap?.id === item.id
-                                                    ? 'border-foreground/40 ring-2 ring-foreground/10'
-                                                    : 'border-border/70'
-                                            }`}
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <p className="font-medium text-foreground">
-                                                        {item.title ??
-                                                            __(
-                                                                'Untitled scrap',
-                                                            )}
-                                                    </p>
-                                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                        {item.summary ??
-                                                            __(
-                                                                'No summary yet. This is still raw capture.',
-                                                            )}
-                                                    </p>
-                                                </div>
-                                                <Badge
-                                                    variant={toneForStatus(
-                                                        item.status,
-                                                    )}
-                                                >
-                                                    {statusLabels[
-                                                        item.status
-                                                    ] ?? item.status}
-                                                </Badge>
-                                            </div>
-                                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                <span>
-                                                    {sourceLabels[
-                                                        item.sourceType
-                                                    ] ?? item.sourceType}
-                                                </span>
-                                                {item.tags.map((tag) => (
-                                                    <Badge
-                                                        key={tag}
-                                                        variant="outline"
-                                                        className="text-[11px]"
-                                                    >
-                                                        #{tag}
-                                                    </Badge>
-                                                ))}
-                                                <span>•</span>
-                                                <span>
-                                                    <DateDisplay
-                                                        value={item.occurredAt}
-                                                    />
-                                                </span>
-                                            </div>
-                                        </Link>
+                                            onClick={
+                                                !item.slug
+                                                    ? () => {
+                                                          openScrap(item);
+                                                          setShowMobileRecent(
+                                                              false,
+                                                          );
+                                                      }
+                                                    : undefined
+                                            }
+                                            compact
+                                            statusLabel={
+                                                statusLabels[item.status]
+                                            }
+                                            sourceLabel={
+                                                sourceLabels[item.sourceType]
+                                            }
+                                        />
                                     ))}
                                 </div>
                             </InfiniteScroll>
@@ -978,30 +916,28 @@ export default function Dashboard({
 
                 {/* Filter toolbar */}
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center rounded-lg bg-muted/50 p-0.5 text-sm">
-                        <button
-                            type="button"
-                            onClick={() => visitStatus('active')}
-                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                !isArchivedView
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {__('Active')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => visitStatus('archived')}
-                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                isArchivedView
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {__('Archived')}
-                        </button>
-                    </div>
+                    <Tabs
+                        value={activeStatus}
+                        onValueChange={(v) =>
+                            visitStatus(v as 'active' | 'archived')
+                        }
+                        className="w-auto"
+                    >
+                        <TabsList className="h-10 rounded-xl bg-muted/50 p-1">
+                            <TabsTrigger
+                                value="active"
+                                className="rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                            >
+                                {__('Active')}
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="archived"
+                                className="rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                            >
+                                {__('Archived')}
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
                     {availableTags.length > 0 && (
                         <div className="flex flex-wrap gap-2">
@@ -1033,7 +969,7 @@ export default function Dashboard({
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.72fr)]">
-                    <Card className="border-sidebar-border/70 shadow-sm">
+                    <Card className="border-border/50 shadow-sm">
                         <CardHeader className="gap-3">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
@@ -1764,238 +1700,161 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
 
-                    <div className="hidden gap-6 lg:grid">
-                        <Card className="border-sidebar-border/70 shadow-sm">
-                            <CardHeader>
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center rounded-lg bg-muted/50 p-0.5 text-sm">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setRightPanelTab('recent')
-                                            }
-                                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                                rightPanelTab === 'recent'
-                                                    ? 'bg-foreground text-background'
-                                                    : 'text-muted-foreground hover:text-foreground'
-                                            }`}
+                    <div className="hidden min-w-0 lg:flex lg:flex-col">
+                        <Card className="border-border/50 shadow-sm">
+                            <CardHeader className="pb-0">
+                                <Tabs
+                                    value={rightPanelTab}
+                                    onValueChange={(v) =>
+                                        setRightPanelTab(
+                                            v as 'recent' | 'similar',
+                                        )
+                                    }
+                                >
+                                    <TabsList className="h-10 w-full rounded-xl bg-muted/50 p-1">
+                                        <TabsTrigger
+                                            value="recent"
+                                            className="flex-1 gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
                                         >
                                             {__('Recent')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setRightPanelTab('similar')
-                                            }
+                                            <Badge
+                                                variant="secondary"
+                                                className="ml-1 h-5 text-[10px]"
+                                            >
+                                                {recentScraps.length}
+                                            </Badge>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="similar"
                                             disabled={
                                                 relatedScraps.length === 0
                                             }
-                                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                                rightPanelTab === 'similar'
-                                                    ? 'bg-foreground text-background'
-                                                    : relatedScraps.length === 0
-                                                      ? 'cursor-not-allowed text-muted-foreground/40'
-                                                      : 'text-muted-foreground hover:text-foreground'
-                                            }`}
+                                            className="flex-1 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
                                         >
                                             {__('Similar')}
-                                        </button>
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            </CardHeader>
+                            <CardContent className="overflow-hidden pt-3">
+                                {rightPanelTab === 'similar' && (
+                                    <div className="space-y-2">
+                                        {relatedScraps.map((related) => (
+                                            <Link
+                                                key={related.id}
+                                                href={
+                                                    related.slug
+                                                        ? workspaceShow(
+                                                              related.slug,
+                                                              routeQuery(
+                                                                  activeTag,
+                                                              ),
+                                                          )
+                                                        : workspaceIndex(
+                                                              routeQuery(
+                                                                  activeTag,
+                                                              ),
+                                                          )
+                                                }
+                                                prefetch
+                                                className="block rounded-xl border border-border/50 bg-background/60 px-4 py-3 transition-all hover:border-primary/30 hover:shadow-md"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-medium text-foreground">
+                                                            {related.title ??
+                                                                __(
+                                                                    'Untitled scrap',
+                                                                )}
+                                                        </p>
+                                                        {related.summary && (
+                                                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                                {
+                                                                    related.summary
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="shrink-0 rounded-lg text-[10px]"
+                                                    >
+                                                        {Math.round(
+                                                            related.similarity *
+                                                                100,
+                                                        )}
+                                                        %
+                                                    </Badge>
+                                                </div>
+                                            </Link>
+                                        ))}
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsRecentScrapsOpen(
-                                                (current) => !current,
-                                            )
-                                        }
-                                        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                                        aria-label={
-                                            isRecentScrapsOpen
-                                                ? __('Collapse')
-                                                : __('Expand')
+                                )}
+                                {rightPanelTab === 'recent' && (
+                                    <InfiniteScroll
+                                        data="inboxItems"
+                                        manual
+                                        next={({ loading, fetch, hasMore }) =>
+                                            hasMore ? (
+                                                <div className="pt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        className="w-full"
+                                                        disabled={loading}
+                                                        onClick={fetch}
+                                                    >
+                                                        {loading
+                                                            ? __('Loading...')
+                                                            : __('Load more')}
+                                                    </Button>
+                                                </div>
+                                            ) : null
                                         }
                                     >
-                                        <ChevronDown
-                                            className={`size-4 transition-transform duration-200 ${isRecentScrapsOpen ? 'rotate-0' : '-rotate-90'}`}
-                                        />
-                                    </button>
-                                </div>
-                            </CardHeader>
-                            {isRecentScrapsOpen && (
-                                <CardContent className="space-y-3">
-                                    {rightPanelTab === 'similar' && (
                                         <div className="space-y-2">
-                                            {relatedScraps.map((related) => (
-                                                <Link
-                                                    key={related.id}
-                                                    href={
-                                                        related.slug
-                                                            ? workspaceShow(
-                                                                  related.slug,
-                                                                  routeQuery(
-                                                                      activeTag,
-                                                                  ),
-                                                              )
-                                                            : workspaceIndex(
-                                                                  routeQuery(
-                                                                      activeTag,
-                                                                  ),
-                                                              )
+                                            {recentScraps.map((item) => (
+                                                <ScrapCard
+                                                    key={item.id}
+                                                    item={item}
+                                                    isSelected={
+                                                        selectedScrap?.id ===
+                                                        item.id
                                                     }
-                                                    prefetch
-                                                    className="block rounded-xl border border-border/70 bg-background/60 px-4 py-3 transition-colors hover:bg-accent/40"
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-medium text-foreground">
-                                                                {related.title ??
-                                                                    __(
-                                                                        'Untitled scrap',
-                                                                    )}
-                                                            </p>
-                                                            {related.summary && (
-                                                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                                                    {
-                                                                        related.summary
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <span className="shrink-0 text-xs text-muted-foreground">
-                                                            {Math.round(
-                                                                related.similarity *
-                                                                    100,
-                                                            )}
-                                                            %
-                                                        </span>
-                                                    </div>
-                                                </Link>
+                                                    href={
+                                                        item.slug
+                                                            ? workspaceShow(
+                                                                  item.slug,
+                                                                  routeQuery(
+                                                                      activeTag,
+                                                                  ),
+                                                              )
+                                                            : undefined
+                                                    }
+                                                    onClick={
+                                                        !item.slug
+                                                            ? () =>
+                                                                  openScrap(
+                                                                      item,
+                                                                  )
+                                                            : undefined
+                                                    }
+                                                    compact
+                                                    statusLabel={
+                                                        statusLabels[
+                                                            item.status
+                                                        ]
+                                                    }
+                                                    sourceLabel={
+                                                        sourceLabels[
+                                                            item.sourceType
+                                                        ]
+                                                    }
+                                                />
                                             ))}
                                         </div>
-                                    )}
-                                    {rightPanelTab === 'recent' && (
-                                        <InfiniteScroll
-                                            data="inboxItems"
-                                            manual
-                                            next={({
-                                                loading,
-                                                fetch,
-                                                hasMore,
-                                            }) =>
-                                                hasMore ? (
-                                                    <div className="pt-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full"
-                                                            disabled={loading}
-                                                            onClick={fetch}
-                                                        >
-                                                            {loading
-                                                                ? __(
-                                                                      'Loading...',
-                                                                  )
-                                                                : __(
-                                                                      'Load more',
-                                                                  )}
-                                                        </Button>
-                                                    </div>
-                                                ) : null
-                                            }
-                                        >
-                                            <div className="space-y-3">
-                                                {recentScraps.map((item) => (
-                                                    <Link
-                                                        key={item.id}
-                                                        href={
-                                                            item.slug
-                                                                ? workspaceShow(
-                                                                      item.slug,
-                                                                      routeQuery(
-                                                                          activeTag,
-                                                                      ),
-                                                                  )
-                                                                : workspaceIndex(
-                                                                      routeQuery(
-                                                                          activeTag,
-                                                                      ),
-                                                                  )
-                                                        }
-                                                        prefetch
-                                                        onClick={() => {
-                                                            if (!item.slug) {
-                                                                openScrap(item);
-                                                            }
-                                                        }}
-                                                        className={`block w-full rounded-2xl border bg-background/80 p-4 text-left transition-colors hover:bg-accent/40 ${
-                                                            selectedScrap?.id ===
-                                                            item.id
-                                                                ? 'border-foreground/40 ring-2 ring-foreground/10'
-                                                                : 'border-border/70'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div>
-                                                                <p className="font-medium text-foreground">
-                                                                    {item.title ??
-                                                                        __(
-                                                                            'Untitled scrap',
-                                                                        )}
-                                                                </p>
-                                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                                    {item.summary ??
-                                                                        __(
-                                                                            'No summary yet. This is still raw capture.',
-                                                                        )}
-                                                                </p>
-                                                            </div>
-                                                            <Badge
-                                                                variant={toneForStatus(
-                                                                    item.status,
-                                                                )}
-                                                            >
-                                                                {statusLabels[
-                                                                    item.status
-                                                                ] ??
-                                                                    item.status}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                            <span>
-                                                                {sourceLabels[
-                                                                    item
-                                                                        .sourceType
-                                                                ] ??
-                                                                    item.sourceType}
-                                                            </span>
-                                                            {item.tags.map(
-                                                                (tag) => (
-                                                                    <Badge
-                                                                        key={
-                                                                            tag
-                                                                        }
-                                                                        variant="outline"
-                                                                        className="text-[11px]"
-                                                                    >
-                                                                        #{tag}
-                                                                    </Badge>
-                                                                ),
-                                                            )}
-                                                            <span>•</span>
-                                                            <span>
-                                                                <DateDisplay
-                                                                    value={
-                                                                        item.occurredAt
-                                                                    }
-                                                                />
-                                                            </span>
-                                                        </div>
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        </InfiniteScroll>
-                                    )}
-                                </CardContent>
-                            )}
+                                    </InfiniteScroll>
+                                )}
+                            </CardContent>
                         </Card>
                     </div>
                 </div>

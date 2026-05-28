@@ -67,7 +67,7 @@ function renderInlineMarkdown(text: string): React.ReactNode {
             fragments.push(
                 <code
                     key={`code-${match.index}`}
-                    className="rounded bg-muted px-1 py-0.5 text-[0.9em]"
+                    className="rounded-lg bg-primary/10 px-1.5 py-0.5 font-mono text-[0.9em] text-primary"
                 >
                     {token.slice(1, -1)}
                 </code>,
@@ -88,7 +88,7 @@ function renderInlineMarkdown(text: string): React.ReactNode {
                         href={linkMatch[2]}
                         target="_blank"
                         rel="noreferrer"
-                        className="underline underline-offset-4"
+                        className="text-primary underline underline-offset-4 transition-colors hover:text-primary/80"
                     >
                         {linkMatch[1]}
                     </a>,
@@ -130,7 +130,7 @@ export function MarkdownPreview({ content }: { content: string }) {
         nodes.push(
             <ul
                 key={`list-${nodes.length}`}
-                className="list-disc space-y-1 pl-5"
+                className="list-disc space-y-1 pl-5 marker:text-primary/50"
             >
                 {listItems.map((item, index) => (
                     <li key={index}>{renderInlineMarkdown(item)}</li>
@@ -149,7 +149,7 @@ export function MarkdownPreview({ content }: { content: string }) {
         nodes.push(
             <blockquote
                 key={`quote-${nodes.length}`}
-                className="border-l-2 border-border pl-4 text-muted-foreground"
+                className="border-l-2 border-primary/30 pl-4 text-muted-foreground italic"
             >
                 {quoteLines.map((line, index) => (
                     <p key={index}>{renderInlineMarkdown(line)}</p>
@@ -168,7 +168,7 @@ export function MarkdownPreview({ content }: { content: string }) {
         nodes.push(
             <ol
                 key={`ordered-list-${nodes.length}`}
-                className="list-decimal space-y-1 pl-5"
+                className="list-decimal space-y-1 pl-5 marker:text-primary/50"
             >
                 {orderedListItems.map((item, index) => (
                     <li key={index}>{renderInlineMarkdown(item)}</li>

@@ -12,6 +12,8 @@ import { DateDisplay } from '@/components/date-display';
 import { MarkdownPreview } from '@/components/markdown-preview';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toneForStatus } from '@/lib/scrap-utils';
 import { articles } from '@/routes';
 import { show as articlesShow } from '@/routes/articles';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
@@ -73,28 +75,6 @@ type ArticlesProps = {
     activeStatus: 'active' | 'archived';
     backups: BackupEntry[];
 };
-
-function toneForStatus(
-    status: string,
-): 'default' | 'secondary' | 'outline' | 'destructive' {
-    if (status === 'failed') {
-        return 'destructive';
-    }
-
-    if (status === 'raw' || status === 'queued') {
-        return 'secondary';
-    }
-
-    if (
-        status === 'final' ||
-        status === 'completed' ||
-        status === 'processed'
-    ) {
-        return 'default';
-    }
-
-    return 'outline';
-}
 
 function formatFileSize(bytes: number): string {
     if (bytes === 0) {
@@ -571,30 +551,30 @@ export default function Articles({
             >
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center rounded-lg bg-muted/50 p-0.5 text-sm">
-                        <button
-                            type="button"
-                            onClick={() => visitStatus('active')}
-                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                !isArchivedView
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {__('Active')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => visitStatus('archived')}
-                            className={`rounded-md px-3 py-1.5 transition-colors ${
-                                isArchivedView
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {__('Archived')}
-                        </button>
-                    </div>
+                    <Tabs
+                        value={activeStatus}
+                        onValueChange={(v) =>
+                            visitStatus(v as 'active' | 'archived')
+                        }
+                        className="w-auto"
+                    >
+                        <TabsList className="h-10 rounded-xl bg-muted/50 p-1">
+                            <TabsTrigger
+                                value="active"
+                                className="gap-2 rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                            >
+                                <FileTextIcon className="size-4" />
+                                {__('Active')}
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="archived"
+                                className="gap-2 rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                            >
+                                <ArchiveIcon className="size-4" />
+                                {__('Archived')}
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
                     {availableTags.length > 0 && (
                         <div className="flex flex-wrap gap-2">
@@ -697,10 +677,10 @@ export default function Articles({
                         {scraps.data.map((item) => (
                             <div
                                 key={item.id}
-                                className={`flex items-start gap-3 rounded-2xl border bg-background/80 p-4 transition-colors hover:bg-accent/40 ${
+                                className={`flex items-start gap-3 rounded-2xl border bg-background/80 p-4 transition-all duration-200 hover:border-primary/30 hover:bg-card hover:shadow-lg hover:shadow-black/5 ${
                                     checkedIds.has(item.id)
-                                        ? 'border-foreground/40 ring-2 ring-foreground/10'
-                                        : 'border-border/70'
+                                        ? 'border-primary/50 ring-2 ring-primary/20'
+                                        : 'border-border/50'
                                 }`}
                             >
                                 <div className="flex shrink-0 items-start pt-0.5">
@@ -708,7 +688,7 @@ export default function Articles({
                                         type="checkbox"
                                         checked={checkedIds.has(item.id)}
                                         onChange={() => toggleItem(item.id)}
-                                        className="size-4 cursor-pointer rounded border-border accent-foreground"
+                                        className="size-4 cursor-pointer rounded border-border accent-primary"
                                         aria-label={
                                             item.title ?? __('Untitled scrap')
                                         }
@@ -748,7 +728,8 @@ export default function Articles({
                                         </Badge>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                        <span>
+                                        <span className="inline-flex items-center gap-1">
+                                            <span className="size-1.5 rounded-full bg-primary/40" />
                                             {sourceLabels[item.sourceType] ??
                                                 item.sourceType}
                                         </span>
