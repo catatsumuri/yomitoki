@@ -1,6 +1,6 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Link } from '@inertiajs/react';
-import { FileText, LayoutGrid } from 'lucide-react';
+import { FileText, LayoutGrid, ScrollText } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -13,7 +13,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { articles, dashboard } from '@/routes';
+import { articles, dashboard, documents } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -29,6 +29,11 @@ export function AppSidebar() {
             title: __('Articles'),
             href: articles(),
             icon: FileText,
+        },
+        {
+            title: __('Documents'),
+            href: documents(),
+            icon: ScrollText,
         },
     ];
 

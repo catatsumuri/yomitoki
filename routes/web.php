@@ -37,6 +37,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard/{slug}', [DashboardController::class, 'show'])->name('dashboard.show');
     Route::get('articles', [ArticlesController::class, 'index'])->name('articles');
     Route::get('articles/{slug}', [ArticlesController::class, 'show'])->name('articles.show');
+    Route::get('documents', [DocumentController::class, 'index'])->name('documents');
+    Route::get('documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
+    Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
     Route::post('documents/compose', [DocumentController::class, 'compose'])->name('documents.compose');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::post('search/init', [SearchController::class, 'init'])->name('search.init');

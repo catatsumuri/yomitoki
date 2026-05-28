@@ -328,6 +328,18 @@ export function MarkdownPreview({ content }: { content: string }) {
             continue;
         }
 
+        if (line.startsWith('#### ')) {
+            nodes.push(
+                <h4
+                    key={`h4-${nodes.length}`}
+                    className="text-base font-semibold"
+                >
+                    {renderInlineMarkdown(line.slice(5))}
+                </h4>,
+            );
+            continue;
+        }
+
         if (line.startsWith('### ')) {
             nodes.push(
                 <h3
