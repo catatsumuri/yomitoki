@@ -200,7 +200,7 @@ class ScrapController extends Controller
             ->get();
 
         if ($scraps->isEmpty()) {
-            return redirect()->route('articles');
+            return redirect()->route('scraps');
         }
 
         $allIdsToArchive = $scraps
@@ -221,7 +221,7 @@ class ScrapController extends Controller
             'message' => __(':count scraps sent to archive.', ['count' => $scraps->count()]),
         ]);
 
-        return redirect()->route('articles');
+        return redirect()->route('scraps');
     }
 
     /**
@@ -547,7 +547,7 @@ TEXT;
         ?Scrap $parentScrap = null,
     ): array {
         [$indexRoute, $query] = $this->workspaceRouteContext($request);
-        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+        $showRoute = $indexRoute === 'scraps' ? 'scraps.show' : 'dashboard.show';
 
         if ($scrap->parent_id !== null) {
             $parentScrap ??= $scrap->parent;
@@ -572,7 +572,7 @@ TEXT;
     private function workspaceRedirectTargetAfterArchive(Request $request, Scrap $scrap): array
     {
         [$indexRoute, $query] = $this->workspaceRouteContext($request);
-        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+        $showRoute = $indexRoute === 'scraps' ? 'scraps.show' : 'dashboard.show';
 
         if ($scrap->parent_id !== null && $scrap->parent?->slug !== null) {
             return [$showRoute, [...$query, 'slug' => $scrap->parent->slug]];
@@ -589,7 +589,7 @@ TEXT;
     private function workspaceRedirectTargetAfterRestore(Request $request, Scrap $scrap): array
     {
         [$indexRoute, $query] = $this->workspaceRouteContext($request);
-        $showRoute = $indexRoute === 'articles' ? 'articles.show' : 'dashboard.show';
+        $showRoute = $indexRoute === 'scraps' ? 'scraps.show' : 'dashboard.show';
 
         if (($query['status'] ?? null) === 'archived') {
             unset($query['status']);
@@ -629,8 +629,8 @@ TEXT;
                 : null,
         ]);
 
-        if (str_starts_with($path, '/articles')) {
-            return ['articles', $query];
+        if (str_starts_with($path, '/scraps')) {
+            return ['scraps', $query];
         }
 
         return ['dashboard', $query];

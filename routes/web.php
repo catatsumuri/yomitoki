@@ -1,12 +1,12 @@
 <?php
 
 use App\Http\Controllers\ArchivesController;
-use App\Http\Controllers\ArticlesController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\ScrapController;
+use App\Http\Controllers\ScrapsController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -35,10 +35,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('scraps/{scrap}/backup', [BackupController::class, 'backupScrap'])->name('scraps.backup');
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/{slug}', [DashboardController::class, 'show'])->name('dashboard.show');
-    Route::get('articles', [ArticlesController::class, 'index'])->name('articles');
-    Route::get('articles/{slug}', [ArticlesController::class, 'show'])->name('articles.show');
+    Route::get('scraps', [ScrapsController::class, 'index'])->name('scraps');
+    Route::get('scraps/{slug}', [ScrapsController::class, 'show'])->name('scraps.show');
     Route::get('documents', [DocumentController::class, 'index'])->name('documents');
     Route::get('documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
+    Route::get('documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
+    Route::get('documents/{document}/revisions', [DocumentController::class, 'revisions'])->name('documents.revisions');
+    Route::patch('documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
     Route::post('documents/compose', [DocumentController::class, 'compose'])->name('documents.compose');
     Route::get('search', [SearchController::class, 'index'])->name('search');

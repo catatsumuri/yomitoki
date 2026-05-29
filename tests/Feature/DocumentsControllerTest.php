@@ -64,7 +64,7 @@ test('authenticated users can view a document detail', function () {
             ->where('selectedDocument.id', $document->id)
             ->where('selectedDocument.title', 'My Spec Document')
             ->where('selectedDocument.documentType', 'spec')
-            ->where('selectedDocument.status', 'draft')
+            ->where('selectedDocument.tags', [])
             ->where('selectedDocument.summary', 'A brief summary.')
             ->has('selectedDocument.scraps')
         );
@@ -101,4 +101,53 @@ test('users cannot delete documents belonging to other users', function () {
         ->assertForbidden();
 
     $this->assertModelExists($document);
+});
+
+test('authenticated users can update a document including tags', function () {
+    $user = User::factory()->create();
+    $document = Document::factory()->for($user)->create([
+        'title' => 'Old Title',
+        'content_markdown' => 'Old content.',
+    ]);
+
+    $this->actingAs($user)
+        ->patch(route('documents.update', $document), [
+            'title' => 'New Title',
+            'content_markdown' => 'New content.',
+            'tags' => ['design', 'api'],
+        ])
+        ->assertRedirect(route('documents.show', $document));
+
+    $document->refresh();
+    expect($document->title)->toBe('New Title');
+    expect($document->content_markdown)->toBe('New content.');
+    expect($document->meta['tags'])->toBe(['design', 'api']);
+});
+
+test('users cannot update documents belonging to other users', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $document = Document::factory()->for($other)->create();
+
+    $this->actingAs($user)
+        ->patch(route('documents.update', $document), [
+            'title' => 'Hacked',
+            'content_markdown' => 'x',
+            'tags' => [],
+        ])
+        ->assertForbidden();
+});
+
+test('documents index can be filtered by tag', function () {
+    $user = User::factory()->create();
+    Document::factory()->for($user)->create(['meta' => ['tags' => ['design']]]);
+    Document::factory()->for($user)->create(['meta' => ['tags' => ['api']]]);
+
+    $this->actingAs($user)
+        ->get(route('documents', ['tag' => 'design']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('documents.data', 1)
+            ->where('activeTag', 'design')
+        );
 });

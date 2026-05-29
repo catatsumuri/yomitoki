@@ -373,22 +373,22 @@ test('authenticated users can restore archived top level scraps', function () {
     $response->assertInertiaFlash('toast.message', 'Scrap was restored.');
 });
 
-test('restoring an archived scrap from the articles workspace redirects back to articles', function () {
+test('restoring an archived scrap from the scraps workspace redirects back to scraps', function () {
     $user = User::factory()->create();
     $scrap = Scrap::factory()->for($user)->create([
         'status' => 'archived',
-        'slug' => 'restore-from-articles',
+        'slug' => 'restore-from-scraps',
     ]);
 
     $response = $this
         ->actingAs($user)
-        ->withHeader('referer', route('articles.show', [
-            'slug' => 'restore-from-articles',
+        ->withHeader('referer', route('scraps.show', [
+            'slug' => 'restore-from-scraps',
             'status' => 'archived',
         ]))
         ->post(route('scraps.restore', $scrap));
 
-    $response->assertRedirect(route('articles.show', ['slug' => 'restore-from-articles']));
+    $response->assertRedirect(route('scraps.show', ['slug' => 'restore-from-scraps']));
 });
 
 test('restoring a child scrap also restores archived ancestors', function () {
@@ -432,23 +432,23 @@ test('authenticated users can permanently delete archived scraps', function () {
     $response->assertInertiaFlash('toast.message', 'Scrap was permanently deleted.');
 });
 
-test('permanently deleting an archived scrap from the articles workspace redirects back to articles', function () {
+test('permanently deleting an archived scrap from the scraps workspace redirects back to scraps', function () {
     $user = User::factory()->create();
     $scrap = Scrap::factory()->for($user)->create([
         'status' => 'archived',
-        'slug' => 'delete-from-articles',
+        'slug' => 'delete-from-scraps',
     ]);
 
     $response = $this
         ->actingAs($user)
-        ->withHeader('referer', route('articles.show', [
-            'slug' => 'delete-from-articles',
+        ->withHeader('referer', route('scraps.show', [
+            'slug' => 'delete-from-scraps',
             'status' => 'archived',
         ]))
         ->delete(route('scraps.destroy', $scrap));
 
     $this->assertModelMissing($scrap);
-    $response->assertRedirect(route('articles', ['status' => 'archived']));
+    $response->assertRedirect(route('scraps', ['status' => 'archived']));
 });
 
 test('permanently deleting an archived parent removes its child scraps', function () {
@@ -490,7 +490,7 @@ test('authenticated users can bulk archive multiple scraps', function () {
     expect($scrapB->fresh()->status)->toBe('archived');
     expect($child->fresh()->status)->toBe('archived');
 
-    $response->assertRedirect(route('articles'));
+    $response->assertRedirect(route('scraps'));
     $response->assertInertiaFlash('toast.message', '2 件をアーカイブしました。');
 });
 

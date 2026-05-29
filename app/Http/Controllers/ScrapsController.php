@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class ArticlesController extends Controller
+class ScrapsController extends Controller
 {
     /**
      * Show the article list, or the backup history when ?view=backups.
@@ -108,7 +108,7 @@ class ArticlesController extends Controller
             return $backup;
         });
 
-        return Inertia::render('articles', [
+        return Inertia::render('scraps', [
             'view' => 'backups',
             'backups' => $backups->values()->all(),
             'scraps' => ['data' => []],
@@ -146,7 +146,7 @@ class ArticlesController extends Controller
             ->paginate(5, pageName: 'scraps')
             ->through(fn (Scrap $scrap) => $this->mapScrap($scrap)));
 
-        return Inertia::render('articles', [
+        return Inertia::render('scraps', [
             'view' => 'list',
             'scraps' => $scraps,
             'availableTags' => $this->availableTagsForUser($user->id, $status),

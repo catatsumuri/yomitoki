@@ -6,6 +6,8 @@ use App\Ai\Agents\ComposeDocumentAgent;
 use App\Jobs\ComposeDocumentJob;
 use App\Models\AiRun;
 use App\Models\Document;
+use App\Models\DocumentRevision;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,8 +20,10 @@ class DocumentController extends Controller
      */
     public function index(Request $request): Response
     {
-        $documents = Inertia::scroll(fn () => Document::query()
-            ->where('user_id', $request->user()->id)
+        $tag = $request->string('tag')->trim()->value();
+        $baseQuery = Document::query()->where('user_id', $request->user()->id);
+
+        $documents = Inertia::scroll(fn () => $this->applyTagFilter(clone $baseQuery, $tag)
             ->latest()
             ->paginate(10, pageName: 'documents')
             ->through(fn (Document $document) => $this->mapDocument($document)));
@@ -27,6 +31,8 @@ class DocumentController extends Controller
         return Inertia::render('documents', [
             'documents' => $documents,
             'selectedDocument' => null,
+            'availableTags' => $this->availableTagsForUser($request->user()->id),
+            'activeTag' => $tag !== '' ? $tag : null,
         ]);
     }
 
@@ -37,10 +43,12 @@ class DocumentController extends Controller
     {
         abort_if($document->user_id !== $request->user()->id, 403);
 
+        $tag = $request->string('tag')->trim()->value();
         $document->load('scraps');
 
-        $documents = Inertia::scroll(fn () => Document::query()
-            ->where('user_id', $request->user()->id)
+        $baseQuery = Document::query()->where('user_id', $request->user()->id);
+
+        $documents = Inertia::scroll(fn () => $this->applyTagFilter(clone $baseQuery, $tag)
             ->latest()
             ->paginate(10, pageName: 'documents')
             ->through(fn (Document $doc) => $this->mapDocument($doc)));
@@ -48,7 +56,104 @@ class DocumentController extends Controller
         return Inertia::render('documents', [
             'documents' => $documents,
             'selectedDocument' => $this->mapDocument($document, withScraps: true),
+            'availableTags' => $this->availableTagsForUser($request->user()->id),
+            'activeTag' => $tag !== '' ? $tag : null,
         ]);
+    }
+
+    /**
+     * Show the edit form for a document.
+     */
+    public function edit(Request $request, Document $document): Response
+    {
+        abort_if($document->user_id !== $request->user()->id, 403);
+
+        $meta = is_array($document->meta) ? $document->meta : [];
+
+        return Inertia::render('documents/edit', [
+            'document' => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'contentMarkdown' => $document->content_markdown,
+                'tags' => collect($meta['tags'] ?? [])
+                    ->filter(fn (mixed $tag) => is_string($tag) && $tag !== '')
+                    ->values()
+                    ->all(),
+            ],
+        ]);
+    }
+
+    /**
+     * Show the revision history for a document.
+     */
+    public function revisions(Request $request, Document $document): Response
+    {
+        abort_if($document->user_id !== $request->user()->id, 403);
+
+        $snapshots = $document->revisions()
+            ->select(['id', 'title', 'content_markdown', 'created_at'])
+            ->get()
+            ->map(fn (DocumentRevision $revision) => [
+                'id' => $revision->id,
+                'title' => $revision->title,
+                'contentMarkdown' => $revision->content_markdown,
+                'createdAt' => $revision->created_at->toIso8601String(),
+                'isCurrent' => false,
+            ])
+            ->all();
+
+        $current = [
+            'id' => 0,
+            'title' => $document->title,
+            'contentMarkdown' => $document->content_markdown,
+            'createdAt' => $document->updated_at->toIso8601String(),
+            'isCurrent' => true,
+        ];
+
+        return Inertia::render('documents/revisions', [
+            'document' => [
+                'id' => $document->id,
+                'title' => $document->title,
+            ],
+            'revisions' => [$current, ...$snapshots],
+        ]);
+    }
+
+    /**
+     * Update a document, saving the current state as a revision first.
+     */
+    public function update(Request $request, Document $document): RedirectResponse
+    {
+        abort_if($document->user_id !== $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'content_markdown' => ['required', 'string'],
+            'tags' => ['present', 'array'],
+            'tags.*' => ['string', 'max:50'],
+        ]);
+
+        DocumentRevision::create([
+            'document_id' => $document->id,
+            'title' => $document->title,
+            'content_markdown' => $document->content_markdown,
+        ]);
+
+        $tags = array_values(array_unique(array_filter(
+            $validated['tags'],
+            fn (mixed $tag) => is_string($tag) && $tag !== '',
+        )));
+
+        $document->update([
+            'title' => $validated['title'],
+            'content_markdown' => $validated['content_markdown'],
+            'meta' => [
+                ...($document->meta ?? []),
+                'tags' => $tags,
+            ],
+        ]);
+
+        return redirect()->route('documents.show', $document);
     }
 
     /**
@@ -102,18 +207,55 @@ class DocumentController extends Controller
         return redirect()->back();
     }
 
+    private function applyTagFilter(EloquentBuilder $query, string $tag): EloquentBuilder
+    {
+        if ($tag === '') {
+            return $query;
+        }
+
+        return $query->whereJsonContains('meta->tags', $tag);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function availableTagsForUser(int $userId): array
+    {
+        return Document::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('meta')
+            ->pluck('meta')
+            ->flatMap(function (mixed $meta): array {
+                $tags = $meta['tags'] ?? [];
+
+                if (! is_array($tags)) {
+                    return [];
+                }
+
+                return array_values(array_filter($tags, fn (mixed $tag) => is_string($tag) && $tag !== ''));
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function mapDocument(Document $document, bool $withScraps = false): array
     {
+        $meta = is_array($document->meta) ? $document->meta : [];
+
         $data = [
             'id' => $document->id,
             'title' => $document->title,
             'documentType' => $document->document_type,
-            'status' => $document->status,
+            'tags' => collect($meta['tags'] ?? [])
+                ->filter(fn (mixed $tag) => is_string($tag) && $tag !== '')
+                ->values()
+                ->all(),
             'summary' => $document->summary,
-            'outline' => $document->outline,
             'contentMarkdown' => $withScraps ? $document->content_markdown : null,
             'createdAt' => $document->created_at->toIso8601String(),
         ];

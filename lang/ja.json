@@ -68,6 +68,8 @@
     "Current password": "現在のパスワード",
     "Dark": "ダーク",
     "Dashboard": "ダッシュボード",
+    "Scraps": "スクラップ",
+    "Documents": "ドキュメント",
     "Backup saved.": "バックアップを保存しました。",
     "Backup :count": ":count 件をバックアップ",
     "Backup complete — :count saved": "バックアップ完了 — :count 件保存",
@@ -102,6 +104,7 @@
     "Duplicate :name": ":nameを複製",
     "Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.": "各リカバリーコードは 1 回だけ使用でき、使用後は削除されます。さらに必要な場合は、上の「コードを再生成」をクリックしてください。",
     "Edit": "編集",
+    "Edit — :title": "編集 — :title",
     "Edit :name": ":name を編集",
     "Email": "メール",
     "Email address": "メールアドレス",
@@ -553,5 +556,20 @@
     "Ping": "接続確認",
     "Prompt": "プロンプト",
     "Send": "送信",
-    "Network error": "ネットワークエラー"
+    "Network error": "ネットワークエラー",
+
+    "History": "履歴",
+    "History — :title": "履歴 — :title",
+    "Back to Edit": "編集に戻る",
+    "View History": "変更履歴",
+    "Select two versions to compare.": "2つのバージョンを選択して比較する",
+    "No versions selected.": "バージョンが選択されていません",
+    "Select one more version.": "もう1つのバージョンを選択してください",
+    "No changes between selected versions.": "選択したバージョン間に変更はありません",
+    "No revision history yet.": "まだ変更履歴がありません",
+    "Current": "現在",
+    "Content": "本文",
+    "Title": "タイトル",
+    "Add tag…": "タグを追加…",
+    "No changes": "変更なし"
 }

@@ -14,10 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toneForStatus } from '@/lib/scrap-utils';
-import { articles } from '@/routes';
-import { show as articlesShow } from '@/routes/articles';
+import { scraps as scrapsRoute } from '@/routes';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
 import { compose as documentsCompose } from '@/routes/documents';
+import { show as scrapsShow } from '@/routes/scraps';
 import { bulkArchive as scrapsBulkArchive } from '@/routes/scraps';
 
 type Scrap = {
@@ -119,7 +119,7 @@ export default function Articles({
     const someChecked = !allChecked && listIds.some((id) => checkedIds.has(id));
 
     setLayoutProps({
-        breadcrumbs: [{ title: __('Articles'), href: articles() }],
+        breadcrumbs: [{ title: __('Scraps'), href: scrapsRoute() }],
     });
 
     // Reset checked state and close any open SSE when filters change
@@ -183,11 +183,11 @@ export default function Articles({
     }
 
     function visitTag(tag: string | null): void {
-        router.visit(articles({ query: routeQuery(tag) }));
+        router.visit(scrapsRoute({ query: routeQuery(tag) }));
     }
 
     function visitStatus(status: 'active' | 'archived'): void {
-        router.visit(articles({ query: routeQuery(activeTag, status) }));
+        router.visit(scrapsRoute({ query: routeQuery(activeTag, status) }));
     }
 
     function toggleItem(id: number): void {
@@ -352,10 +352,10 @@ export default function Articles({
                 >
                     <div>
                         <Link
-                            href={articles({ query: routeQuery(activeTag) })}
+                            href={scrapsRoute({ query: routeQuery(activeTag) })}
                             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                         >
-                            ← {__('Articles')}
+                            ← {__('Scraps')}
                         </Link>
                     </div>
 
@@ -480,10 +480,10 @@ export default function Articles({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => router.visit(articles())}
+                            onClick={() => router.visit(scrapsRoute())}
                             className="text-muted-foreground hover:text-foreground"
                         >
-                            ← {__('Articles')}
+                            ← {__('Scraps')}
                         </Button>
                         <span className="text-sm font-medium text-foreground">
                             {__('Backups')}
@@ -544,7 +544,7 @@ export default function Articles({
     // ── List view ──────────────────────────────────────────────────────────
     return (
         <>
-            <Head title={__('Articles')} />
+            <Head title={__('Scraps')} />
             <div
                 ref={headerRef}
                 className="flex h-full flex-1 flex-col gap-4 p-4 md:p-6"
@@ -610,7 +610,7 @@ export default function Articles({
                         className="ml-auto text-muted-foreground hover:text-foreground"
                         onClick={() =>
                             router.visit(
-                                articles({ query: { view: 'backups' } }),
+                                scrapsRoute({ query: { view: 'backups' } }),
                             )
                         }
                     >
@@ -670,8 +670,8 @@ export default function Articles({
                         {scraps.data.length === 0 && (
                             <p className="py-12 text-center text-sm text-muted-foreground">
                                 {isArchivedView
-                                    ? __('No archived articles.')
-                                    : __('No articles yet.')}
+                                    ? __('No archived scraps.')
+                                    : __('No scraps yet.')}
                             </p>
                         )}
                         {scraps.data.map((item) => (
@@ -697,10 +697,10 @@ export default function Articles({
                                 <Link
                                     href={
                                         item.slug
-                                            ? articlesShow(item.slug, {
+                                            ? scrapsShow(item.slug, {
                                                   query: routeQuery(activeTag),
                                               })
-                                            : articles({
+                                            : scrapsRoute({
                                                   query: routeQuery(activeTag),
                                               })
                                     }

@@ -28,7 +28,7 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
-import { articles, dashboard, documents } from '@/routes';
+import { scraps, dashboard, documents } from '@/routes';
 import { edit as editConfig } from '@/routes/api-tokens';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
@@ -52,8 +52,8 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
             icon: LayoutGrid,
         },
         {
-            title: __('Articles'),
-            href: articles(),
+            title: __('Scraps'),
+            href: scraps(),
             icon: FileText,
         },
         {

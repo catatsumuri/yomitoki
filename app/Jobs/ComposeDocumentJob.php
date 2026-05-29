@@ -70,7 +70,6 @@ class ComposeDocumentJob implements ShouldQueue
             'status' => 'draft',
             'content_markdown' => $response['content_markdown'],
             'summary' => $response['summary'],
-            'outline' => $response['outline'],
         ]);
 
         $pivotRows = $scraps->map(fn (Scrap $scrap, int $index) => [

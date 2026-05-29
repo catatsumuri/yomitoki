@@ -16,7 +16,6 @@ test('job creates a document and marks ai_run as completed', function () {
         'title' => 'Combined Spec',
         'content_markdown' => '# Spec\n\nContent here.',
         'summary' => '仕様書のサマリーです。',
-        'outline' => ['概要', '詳細'],
     ]]);
 
     $user = User::factory()->create();
@@ -40,7 +39,6 @@ test('job creates a document and marks ai_run as completed', function () {
     expect($document->title)->toBe('Combined Spec');
     expect($document->document_type)->toBe('spec');
     expect($document->summary)->toBe('仕様書のサマリーです。');
-    expect($document->outline)->toBe(['概要', '詳細']);
 
     // Pivot rows inserted
     $this->assertDatabaseHas('document_scraps', [
@@ -68,7 +66,6 @@ test('job preserves scrap ordering from input ids', function () {
         'title' => 'Ordered Spec',
         'content_markdown' => '# Content',
         'summary' => 'Summary.',
-        'outline' => [],
     ]]);
 
     $user = User::factory()->create();
@@ -92,7 +89,6 @@ test('job skips scraps belonging to other users', function () {
         'title' => 'Single Spec',
         'content_markdown' => '# Content',
         'summary' => 'Summary.',
-        'outline' => [],
     ]]);
 
     $user = User::factory()->create();

@@ -13,7 +13,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { articles, dashboard, documents } from '@/routes';
+import { scraps, dashboard, documents } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -27,7 +27,7 @@ export function AppSidebar() {
         },
         {
             title: __('Articles'),
-            href: articles(),
+            href: scraps(),
             icon: FileText,
         },
         {
