@@ -3,9 +3,10 @@ set -euo pipefail
 
 # save-plan.sh — 最新プランを DB (scraps テーブル) に保存し、Embedding と AI 要約をキューに積む
 #
-# Usage: save-plan.sh [slug] [project-dir]
+# Usage: save-plan.sh [slug] [project-dir] [description]
 #   slug        : 英数字・ハイフンのみのスラッグ (default: "plan")
 #   project-dir : プロジェクトルートの絶対パス (default: 現在のディレクトリ)
+#   description : 短い説明文。指定すると summary に保存され AI 要約をスキップする (default: "")
 #
 # Title はマークダウンファイルの最初の # H1 見出しから自動抽出する。
 # H1 が見つからない場合はスラッグをタイトルとして使用する。
@@ -15,6 +16,7 @@ set -euo pipefail
 
 SLUG="${1:-plan}"
 PROJECT_DIR="${2:-$(pwd)}"
+DESCRIPTION="${3:-}"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 CONTAINER_ROOT="${CONTAINER_ROOT:-/var/www/html}"
 ARTISAN_BIN="${ARTISAN_BIN:-}"
@@ -49,6 +51,12 @@ if [ -z "$ARTISAN_BIN" ]; then
   fi
 fi
 
+# description オプションを条件付きで組み立てる
+DESCRIPTION_ARGS=()
+if [ -n "$DESCRIPTION" ]; then
+  DESCRIPTION_ARGS=(--description="$DESCRIPTION")
+fi
+
 if [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
   TMP_BASENAME="$(date +%s)-$(basename "$LATEST")"
   TMP_HOST="$TMP_DIR/$TMP_BASENAME"
@@ -60,7 +68,8 @@ if [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
     --slug="$SLUG" \
     --file="$CONTAINER_FILE" \
     --project="$PROJECT_NAME" \
-    --directory="$PROJECT_DIR"
+    --directory="$PROJECT_DIR" \
+    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
 
   rm -f "$TMP_HOST"
 else
@@ -69,5 +78,6 @@ else
     --slug="$SLUG" \
     --file="$LATEST" \
     --project="$PROJECT_NAME" \
-    --directory="$PROJECT_DIR"
+    --directory="$PROJECT_DIR" \
+    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
 fi

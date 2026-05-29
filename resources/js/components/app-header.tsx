@@ -1,6 +1,6 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Link, usePage } from '@inertiajs/react';
-import { FileText, LayoutGrid, Menu, ScrollText } from 'lucide-react';
+import { FileText, LayoutGrid, Menu, ScrollText, Settings } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SearchDialog } from '@/components/search-dialog';
@@ -29,6 +29,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { articles, dashboard, documents } from '@/routes';
+import { edit as editConfig } from '@/routes/api-tokens';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -155,6 +156,19 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
 
                     <div className="ml-auto flex items-center space-x-2">
                         <SearchDialog />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-9"
+                            asChild
+                        >
+                            <Link href={editConfig()} prefetch>
+                                <Settings className="size-4" />
+                                <span className="sr-only">
+                                    {__('App Settings')}
+                                </span>
+                            </Link>
+                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

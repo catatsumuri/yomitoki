@@ -11,7 +11,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
-#[Signature('plans:save {--title= : Plan title} {--slug= : Plan slug} {--file= : Path to plan markdown file} {--project= : Project name (defaults to directory basename)} {--directory= : Project root directory} {--created-from=plan-to-markdown-skill : Identifier for the tool or workflow saving the plan}')]
+#[Signature('plans:save {--title= : Plan title} {--slug= : Plan slug} {--description= : Short description saved as summary} {--file= : Path to plan markdown file} {--project= : Project name (defaults to directory basename)} {--directory= : Project root directory} {--created-from=plan-to-markdown-skill : Identifier for the tool or workflow saving the plan}')]
 #[Description('Save a plan markdown file as a Scrap in the database')]
 class SavePlanCommand extends Command
 {
@@ -56,11 +56,14 @@ class SavePlanCommand extends Command
             $suffix++;
         }
 
+        $description = $this->option('description');
+
         $scrap = Scrap::create([
             'user_id' => $user->id,
             'source_type' => 'plan',
             'title' => $title,
             'slug' => $slug,
+            'summary' => $description ?: null,
             'content' => $content,
             'content_markdown' => $content,
             'status' => 'processed',
@@ -74,7 +77,9 @@ class SavePlanCommand extends Command
         ]);
 
         GenerateScrapEmbeddingJob::dispatch($scrap->id);
-        SummarizeScrapJob::dispatch($scrap->id);
+        if (! $description) {
+            SummarizeScrapJob::dispatch($scrap->id);
+        }
 
         $this->info(__('Plan saved: scrap #:id (slug: :slug) ":title"', [
             'id' => $scrap->id,

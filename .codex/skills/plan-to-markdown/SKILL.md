@@ -14,10 +14,13 @@ Save an approved Codex plan into the application's `scraps` table.
 2. Run:
 
 ```bash
-bash .codex/skills/plan-to-markdown/scripts/save-plan.sh "{slug}"
+bash .codex/skills/plan-to-markdown/scripts/save-plan.sh "{slug}" "{plan-file}" "{project-dir}" "{description}"
 ```
 
 - `{slug}` should be a short kebab-case identifier such as `codex-plan-skills`.
+- `{plan-file}` is optional and defaults to `storage/app/plans-tmp/plan-{slug}.md`.
+- `{project-dir}` is optional and defaults to `pwd`.
+- `{description}` is optional. When provided, it is saved directly to `summary` and AI summarization is skipped.
 - The visible title comes from the markdown H1, not from the slug.
 - The script reads `storage/app/plans-tmp/plan-{slug}.md` by default.
 - If the markdown lives elsewhere, pass it as the second argument.

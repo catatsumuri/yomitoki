@@ -4,6 +4,7 @@ set -euo pipefail
 PLAN_SLUG="${1:?plan slug is required}"
 PROJECT_DIR="${3:-$(pwd)}"
 PLAN_FILE="${2:-$PROJECT_DIR/storage/app/plans-tmp/plan-$PLAN_SLUG.md}"
+DESCRIPTION="${4:-}"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 CONTAINER_ROOT="${CONTAINER_ROOT:-/var/www/html}"
 ARTISAN_BIN="${ARTISAN_BIN:-}"
@@ -33,6 +34,11 @@ if [ -z "$ARTISAN_BIN" ]; then
   fi
 fi
 
+DESCRIPTION_ARGS=()
+if [ -n "$DESCRIPTION" ]; then
+  DESCRIPTION_ARGS=(--description="$DESCRIPTION")
+fi
+
 if [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
   TMP_BASENAME="$(date +%s)-$(basename "$PLAN_FILE")"
   TMP_HOST="$TMP_DIR/$TMP_BASENAME"
@@ -45,7 +51,8 @@ if [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
     --file="$CONTAINER_FILE" \
     --project="$PROJECT_NAME" \
     --directory="$PROJECT_DIR" \
-    --created-from="codex-plan-to-markdown-skill"
+    --created-from="codex-plan-to-markdown-skill" \
+    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
 
   rm -f "$TMP_HOST"
 else
@@ -55,5 +62,6 @@ else
     --file="$PLAN_FILE" \
     --project="$PROJECT_NAME" \
     --directory="$PROJECT_DIR" \
-    --created-from="codex-plan-to-markdown-skill"
+    --created-from="codex-plan-to-markdown-skill" \
+    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
 fi

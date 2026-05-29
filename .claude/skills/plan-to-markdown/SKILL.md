@@ -19,10 +19,12 @@ description: This skill should be used when the user invokes plan mode, uses /pl
 **ExitPlanMode が承認された直後**、以下を実行すること：
 
 ```bash
-bash <skill-dir>/scripts/save-plan.sh "{plan-title-slug}"
+bash <skill-dir>/scripts/save-plan.sh "{plan-title-slug}" "{project-dir}" "{description}"
 ```
 
 - `{plan-title-slug}` はプランの内容を表す英数字・ハイフンのみの短いスラッグ（例: `add-user-auth`, `embed-posts`, `sync-mode`）
+- `{project-dir}` はプロジェクトルートの絶対パス（省略時は `pwd`）
+- `{description}` はプランの短い説明文（省略可。指定するとAI要約をスキップして summary に直接保存される）
 - `<skill-dir>` は実際のスキルディレクトリのパス（例: `/opt/home-admin/yomitoki/.claude/skills/plan-to-markdown`）に置き換えること
 
 **実行タイミングの注意：**
@@ -35,7 +37,7 @@ bash <skill-dir>/scripts/save-plan.sh "{plan-title-slug}"
 ✓ Plan saved: scrap #42 "add-user-auth"
 ```
 
-保存後、キューワーカーが Embedding と summary を非同期で生成する。
+description を渡した場合は summary に直接保存され AI 要約をスキップする。省略した場合はキューワーカーが Embedding と summary を非同期で生成する。
 
 ## Bundled Script
 
