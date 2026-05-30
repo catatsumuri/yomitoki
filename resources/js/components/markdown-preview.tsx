@@ -128,7 +128,7 @@ export function MarkdownPreview({
     headingPrefix?: string;
 }) {
     // Reset the dispenser whenever content or prefix changes so IDs stay consistent.
-     
+
     const dispenser = useMemo(
         () => (headingPrefix ? createIdDispenser() : null),
         [headingPrefix, content],

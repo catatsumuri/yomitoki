@@ -145,22 +145,7 @@ This phase proves that AI-generated plans are useful knowledge artifacts and giv
 
 Add a minimal HTTP ingest API so external projects and agents can send Markdown Scraps to Yomitoki.
 
-Planned shape:
-
-```http
-POST /api/scraps
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-```json
-{
-  "title": "External project implementation plan",
-  "source_type": "plan",
-  "project": "sample-app",
-  "content_markdown": "# Plan\n\nMarkdown from another project."
-}
-```
+**Implemented.** See [API Reference](#api-reference) below.
 
 This turns Yomitoki from a self-contained plan previewer into a cross-project knowledge hub for AI-assisted work.
 
@@ -173,6 +158,125 @@ Move beyond storing Scraps toward maintaining higher-level knowledge structures:
 - stale or conflicting Scrap detection
 - automatic relationship discovery
 - continuously updated generated documents
+
+## API Reference
+
+All endpoints require a Sanctum API token with the `ingest` ability.
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+Tokens can be generated from **Settings → API Tokens**.
+
+### POST /api/scraps
+
+Create a new Scrap.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | yes | Scrap title |
+| `content_markdown` | string | yes | Markdown body |
+| `source_type` | string | no | `plan` (default), `note`, `result`, `research`, `meeting` |
+| `project` | string | no | Project name, added as a tag |
+| `directory` | string | no | Source directory path |
+| `slug` | string | no | Custom slug (`[a-z0-9-]`, max 80 chars). Auto-generated if omitted. Suffixed with `-2`, `-3`… on conflict. |
+| `meta` | object | no | Arbitrary key/value metadata |
+
+```json
+{
+  "title": "External project implementation plan",
+  "source_type": "plan",
+  "project": "sample-app",
+  "content_markdown": "# Plan\n\nMarkdown from another project."
+}
+```
+
+Response `201`:
+
+```json
+{
+  "id": 42,
+  "slug": "external-project-implementation-plan",
+  "url": "https://example.com/dashboard/external-project-implementation-plan"
+}
+```
+
+### GET /api/scraps
+
+List Scraps for the authenticated user.
+
+| Query param | Description |
+|---|---|
+| `source_type` | Filter by source type |
+| `status` | Filter by status (`raw`, `processed`, `archived`) |
+| `limit` | Page size, max 100 (default 20) |
+
+Response `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "slug": "my-plan",
+      "title": "My Plan",
+      "source_type": "plan",
+      "status": "processed",
+      "created_at": "2026-05-30T00:00:00Z"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "per_page": 20,
+    "current_page": 1
+  }
+}
+```
+
+### GET /api/scraps/{slug}
+
+Get a single Scrap with its children.
+
+Response `200`:
+
+```json
+{
+  "id": 42,
+  "slug": "my-plan",
+  "title": "My Plan",
+  "source_type": "plan",
+  "status": "processed",
+  "summary": "AI-generated summary.",
+  "content_markdown": "# Plan\n\n...",
+  "occurred_at": "2026-05-30T00:00:00Z",
+  "created_at": "2026-05-30T00:00:00Z",
+  "updated_at": "2026-05-30T00:00:00Z",
+  "children": []
+}
+```
+
+### PATCH /api/scraps/{slug}
+
+Update an existing Scrap. All fields are optional.
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | string | New title |
+| `slug` | string | New slug (`[a-z0-9-]`, max 80 chars) |
+| `content_markdown` | string | New Markdown body. Triggers re-embedding and re-summarization. |
+| `status` | string | `raw`, `processed`, or `archived` |
+| `source_type` | string | `plan`, `note`, `result`, `research`, `meeting`, or `execution` |
+| `summary` | string\|null | Override AI summary |
+
+Response `200`: updated Scrap object (same shape as GET show, without `children`).
+
+### DELETE /api/scraps/{slug}
+
+Delete a Scrap and all its descendants.
+
+Response `204`: no content.
 
 ## Setup
 

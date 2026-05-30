@@ -1,7 +1,7 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
 import { Head, Link, setLayoutProps } from '@inertiajs/react';
-import { diffLines  } from 'diff';
-import type {Change} from 'diff';
+import { diffLines } from 'diff';
+import type { Change } from 'diff';
 import { History } from 'lucide-react';
 import { useState } from 'react';
 import {

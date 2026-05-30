@@ -102,9 +102,7 @@ export default function Documents({
                                 asChild
                             >
                                 <a
-                                    href={
-                                        documentsPdf(selectedDocument.id).url
-                                    }
+                                    href={documentsPdf(selectedDocument.id).url}
                                     download
                                 >
                                     <FileDownIcon className="size-4" />
