@@ -170,6 +170,99 @@ Content-Type: application/json
 
 Tokens can be generated from **Settings → API Tokens**.
 
+### GET /api/search
+
+Semantic vector search over stored Scraps. Generates an embedding for the query and returns similar Scraps ranked by cosine similarity.
+
+| Query param | Type | Default | Description |
+|---|---|---|---|
+| `q` | string | required | Search text (max 500 chars) |
+| `limit` | int | 5 | Max results (max 20) |
+| `source_type` | string | — | Filter by source type |
+| `threshold` | float | 0.2 | Minimum similarity score (0–1) |
+| `include` | string | — | Pass `content` to include `content_markdown` in results |
+
+Response `200`:
+
+```json
+{
+  "query": "authentication implementation",
+  "data": [
+    {
+      "id": 42,
+      "slug": "add-user-auth",
+      "title": "Add User Auth",
+      "source_type": "plan",
+      "status": "processed",
+      "summary": "Fortify + passkeys による認証実装",
+      "similarity": 0.87,
+      "occurred_at": "2026-05-30T00:00:00Z",
+      "url": "https://example.com/dashboard/add-user-auth"
+    }
+  ]
+}
+```
+
+Returns `data: []` when pgvector is unavailable or no matching Scraps exist.
+
+### GET /api/scraps/{slug}/related
+
+Returns Scraps semantically similar to the given Scrap using pgvector cosine distance.
+
+| Query param | Type | Default |
+|---|---|---|
+| `limit` | int | 5 (max 20) |
+
+Response `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 7,
+      "slug": "passkey-setup",
+      "title": "Passkey Setup",
+      "source_type": "plan",
+      "status": "processed",
+      "summary": "...",
+      "similarity": 0.91,
+      "occurred_at": "2026-05-30T00:00:00Z"
+    }
+  ]
+}
+```
+
+Returns `data: []` when the Scrap has no embedding yet.
+
+### GET /api/skills/install
+
+Install Yomitoki agent skills into any project. Run from the project root:
+
+```bash
+curl -H "Authorization: Bearer {token}" \
+  "https://your-yomitoki/api/skills/install?agent=claude_code&profile=full" | bash
+```
+
+| Query param | Values | Default | Description |
+|---|---|---|---|
+| `agent` | `claude_code`, `codex` | `claude_code` | Target agent |
+| `profile` | `basic`, `plan`, `full` | `full` | Skill set to install |
+
+**Profiles:**
+
+| Profile | Skills installed | Use case |
+|---|---|---|
+| `basic` | `scrap-utils` | Push any Markdown to Yomitoki (CI logs, notes, docs) |
+| `plan` | `plan-to-markdown`, `execution-result` | AI agent development log workflow |
+| `full` | All of the above | Both use cases |
+
+The returned script:
+1. Saves `YOMITOKI_URL` and `YOMITOKI_TOKEN` to `~/.config/yomitoki/config`
+2. Creates skill directories (`.claude/skills/` or `.agents/skills/`) in the current directory
+3. Installs the selected skills
+
+**Requirements:** `curl`, `jq`
+
 ### POST /api/scraps
 
 Create a new Scrap.
@@ -178,10 +271,12 @@ Create a new Scrap.
 |---|---|---|---|
 | `title` | string | yes | Scrap title |
 | `content_markdown` | string | yes | Markdown body |
-| `source_type` | string | no | `plan` (default), `note`, `result`, `research`, `meeting` |
+| `source_type` | string | no | `plan` (default), `note`, `result`, `research`, `meeting`, `execution` |
 | `project` | string | no | Project name, added as a tag |
 | `directory` | string | no | Source directory path |
 | `slug` | string | no | Custom slug (`[a-z0-9-]`, max 80 chars). Auto-generated if omitted. Suffixed with `-2`, `-3`… on conflict. |
+| `parent_slug` | string | no | Slug of the parent Scrap. Creates a child relationship (e.g. execution result → plan). |
+| `description` | string | no | Short summary saved directly to `summary`. Skips AI summarization. |
 | `meta` | object | no | Arbitrary key/value metadata |
 
 ```json

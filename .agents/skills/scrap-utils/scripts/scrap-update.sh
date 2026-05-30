@@ -3,66 +3,59 @@ set -euo pipefail
 
 # scrap-update.sh — slug を指定して Scrap を更新する
 #
-# Usage: scrap-update.sh "{slug}" [project-dir] [--title="..."] [--file="..."] [--status="..."] [--new-slug="..."]
-#   slug        : 更新対象のスラッグ（必須）
-#   project-dir : プロジェクトルートの絶対パス (default: 現在のディレクトリ)
-#   その後のオプションはそのまま scraps:update に渡される
+# Usage: scrap-update.sh "{slug}" [--title="..."] [--file="..."] [--status="..."] [--new-slug="..."]
 
-SLUG="${1:-}"
-PROJECT_DIR="${2:-$(pwd)}"
-CONTAINER_ROOT="${CONTAINER_ROOT:-/var/www/html}"
+SLUG="${1:?slug is required}"
+shift
 
-if [ -z "$SLUG" ]; then
-    echo "Error: slug argument is required" >&2
-    exit 1
+if [ -z "${YOMITOKI_URL:-}" ] || [ -z "${YOMITOKI_TOKEN:-}" ]; then
+    CONFIG="$HOME/.config/yomitoki/config"
+    [ -f "$CONFIG" ] && source "$CONFIG"
 fi
+: "${YOMITOKI_URL:?YOMITOKI_URL is not set.}"
+: "${YOMITOKI_TOKEN:?YOMITOKI_TOKEN is not set.}"
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is required. Install with: brew install jq" >&2; exit 1; }
 
-# 残りの引数を収集
-shift 2 2>/dev/null || shift "$#"
-EXTRA_ARGS=("$@")
+TITLE="" FILE="" STATUS="" NEW_SLUG=""
 
-ARTISAN_BIN=""
-cd "$PROJECT_DIR"
-
-if [ -x "vendor/bin/sail" ]; then
-    ARTISAN_BIN="vendor/bin/sail artisan"
-else
-    ARTISAN_BIN="php artisan"
-fi
-
-# --file= オプションがあれば Sail 経由でコピーする
-FILE_ARG=""
-OTHER_ARGS=()
-for arg in "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"; do
-    if [[ "$arg" == --file=* ]]; then
-        FILE_ARG="${arg#--file=}"
-    else
-        OTHER_ARGS+=("$arg")
-    fi
+for arg in "$@"; do
+    case "$arg" in
+        --title=*)    TITLE="${arg#--title=}" ;;
+        --file=*)     FILE="${arg#--file=}" ;;
+        --status=*)   STATUS="${arg#--status=}" ;;
+        --new-slug=*) NEW_SLUG="${arg#--new-slug=}" ;;
+    esac
 done
 
-if [ -n "$FILE_ARG" ] && [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
-    TMP_DIR="$PROJECT_DIR/storage/app/plans-tmp"
-    mkdir -p "$TMP_DIR"
-    TMP_BASENAME="$(date +%s)-$(basename "$FILE_ARG")"
-    TMP_HOST="$TMP_DIR/$TMP_BASENAME"
-    cp "$FILE_ARG" "$TMP_HOST"
-    CONTAINER_FILE="$CONTAINER_ROOT/storage/app/plans-tmp/$TMP_BASENAME"
+PAYLOAD='{}'
 
-    $ARTISAN_BIN scraps:update \
-        --slug="$SLUG" \
-        --file="$CONTAINER_FILE" \
-        "${OTHER_ARGS[@]+"${OTHER_ARGS[@]}"}"
-
-    rm -f "$TMP_HOST"
-else
-    FILE_OPT=()
-    if [ -n "$FILE_ARG" ]; then
-        FILE_OPT=(--file="$FILE_ARG")
-    fi
-
-    $ARTISAN_BIN scraps:update \
-        --slug="$SLUG" \
-        "${FILE_OPT[@]+"${FILE_OPT[@]}"}" \
-        "${OTHER_ARGS[@]+"${OTHER_ARGS[@]}"}"
+if [ -n "$TITLE" ]; then
+    PAYLOAD=$(echo "$PAYLOAD" | jq --arg v "$TITLE" '. + {title: $v}')
 fi
+
+if [ -n "$FILE" ]; then
+    if [ ! -f "$FILE" ]; then
+        echo "Error: file not found: $FILE" >&2
+        exit 1
+    fi
+    PAYLOAD=$(echo "$PAYLOAD" | jq --rawfile v "$FILE" '. + {content_markdown: $v}')
+fi
+
+if [ -n "$STATUS" ]; then
+    PAYLOAD=$(echo "$PAYLOAD" | jq --arg v "$STATUS" '. + {status: $v}')
+fi
+
+if [ -n "$NEW_SLUG" ]; then
+    PAYLOAD=$(echo "$PAYLOAD" | jq --arg v "$NEW_SLUG" '. + {slug: $v}')
+fi
+
+if [ "$PAYLOAD" = '{}' ]; then
+    echo "Warning: no fields to update" >&2
+    exit 0
+fi
+
+curl -sf -X PATCH \
+    -H "Authorization: Bearer $YOMITOKI_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$YOMITOKI_URL/api/scraps/$SLUG" \
+    -d "$PAYLOAD"

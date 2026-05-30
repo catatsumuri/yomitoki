@@ -32,3 +32,13 @@ yarn-error.log
 /testing
 /.playwright-cli
 /plans
+
+# Draft and local-only files
+zenn-draft-yomitoki.md
+app-overview-ja.md
+design-directions.md
+embedding-plan.md
+screen.png
+test-output.pdf
+*.zip
+yomitoki.svg

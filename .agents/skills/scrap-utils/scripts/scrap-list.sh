@@ -3,25 +3,25 @@ set -euo pipefail
 
 # scrap-list.sh — Scrap の slug 一覧を 1 行ずつ出力する
 #
-# Usage: scrap-list.sh [source-type] [project-dir]
+# Usage: scrap-list.sh [source-type]
 #   source-type : 絞り込むソースタイプ (plan, note, execution など)
-#   project-dir : プロジェクトルートの絶対パス (default: 現在のディレクトリ)
 
 SOURCE_TYPE="${1:-}"
-PROJECT_DIR="${2:-$(pwd)}"
 
-ARTISAN_BIN=""
-cd "$PROJECT_DIR"
-
-if [ -x "vendor/bin/sail" ]; then
-    ARTISAN_BIN="vendor/bin/sail artisan"
-else
-    ARTISAN_BIN="php artisan"
+if [ -z "${YOMITOKI_URL:-}" ] || [ -z "${YOMITOKI_TOKEN:-}" ]; then
+    CONFIG="$HOME/.config/yomitoki/config"
+    [ -f "$CONFIG" ] && source "$CONFIG"
 fi
+: "${YOMITOKI_URL:?YOMITOKI_URL is not set. Run the install script or set the env var.}"
+: "${YOMITOKI_TOKEN:?YOMITOKI_TOKEN is not set. Run the install script or set the env var.}"
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is required. Install with: brew install jq" >&2; exit 1; }
 
-SOURCE_TYPE_ARG=()
+URL="$YOMITOKI_URL/api/scraps?limit=1000"
 if [ -n "$SOURCE_TYPE" ]; then
-    SOURCE_TYPE_ARG=(--source-type="$SOURCE_TYPE")
+    URL="$URL&source_type=$SOURCE_TYPE"
 fi
 
-$ARTISAN_BIN scraps:list --slugs-only --limit=1000 "${SOURCE_TYPE_ARG[@]+"${SOURCE_TYPE_ARG[@]}"}"
+curl -sf \
+    -H "Authorization: Bearer $YOMITOKI_TOKEN" \
+    "$URL" \
+    | jq -r '.data[].slug'

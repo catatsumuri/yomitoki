@@ -1,83 +1,59 @@
 #!/bin/bash
 set -euo pipefail
 
-# save-plan.sh — 最新プランを DB (scraps テーブル) に保存し、Embedding と AI 要約をキューに積む
+# save-plan.sh — 最新プランを Yomitoki API に保存する
 #
 # Usage: save-plan.sh [slug] [project-dir] [description]
 #   slug        : 英数字・ハイフンのみのスラッグ (default: "plan")
 #   project-dir : プロジェクトルートの絶対パス (default: 現在のディレクトリ)
-#   description : 短い説明文。指定すると summary に保存され AI 要約をスキップする (default: "")
-#
-# Title はマークダウンファイルの最初の # H1 見出しから自動抽出する。
-# H1 が見つからない場合はスラッグをタイトルとして使用する。
-#
-# Note: artisan は Sail コンテナ内で動くため、ホスト側の ~/.claude/plans/ は
-#       見えない。storage/app/ 経由で一時コピーしてからパスを渡す。
+#   description : 短い説明文。指定すると AI 要約をスキップして summary に直接保存される
 
 SLUG="${1:-plan}"
 PROJECT_DIR="${2:-$(pwd)}"
 DESCRIPTION="${3:-}"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
-CONTAINER_ROOT="${CONTAINER_ROOT:-/var/www/html}"
-ARTISAN_BIN="${ARTISAN_BIN:-}"
 
-# ~/.claude/plans/ の最新ファイルを取得（更新時刻で降順ソート）
+if [ -z "${YOMITOKI_URL:-}" ] || [ -z "${YOMITOKI_TOKEN:-}" ]; then
+    CONFIG="$HOME/.config/yomitoki/config"
+    [ -f "$CONFIG" ] && source "$CONFIG"
+fi
+: "${YOMITOKI_URL:?YOMITOKI_URL is not set.}"
+: "${YOMITOKI_TOKEN:?YOMITOKI_TOKEN is not set.}"
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is required. Install with: brew install jq" >&2; exit 1; }
+
 LATEST=$(find "$HOME/.claude/plans" -name "*.md" -printf '%T@ %p\n' 2>/dev/null \
-  | sort -rn \
-  | head -1 \
-  | cut -d' ' -f2-)
+    | sort -rn \
+    | head -1 \
+    | cut -d' ' -f2-)
 
 if [ -z "$LATEST" ]; then
-  echo "Error: no plan files found in ~/.claude/plans/" >&2
-  exit 1
+    echo "Error: no plan files found in ~/.claude/plans/" >&2
+    exit 1
 fi
 
-# マークダウンの最初の # H1 行からタイトルを抽出
 TITLE=$(grep -m 1 '^# ' "$LATEST" | sed 's/^# //' | tr -d '\r')
 if [ -z "$TITLE" ]; then
-  TITLE="$SLUG"
+    TITLE="$SLUG"
 fi
 
-TMP_DIR="$PROJECT_DIR/storage/app/plans-tmp"
-mkdir -p "$TMP_DIR"
+PAYLOAD=$(jq -n \
+    --arg title "$TITLE" \
+    --arg slug "$SLUG" \
+    --rawfile content "$LATEST" \
+    --arg project "$PROJECT_NAME" \
+    --arg directory "$PROJECT_DIR" \
+    '{title: $title, slug: $slug, content_markdown: $content, source_type: "plan", project: $project, directory: $directory}')
 
-cd "$PROJECT_DIR"
-
-if [ -z "$ARTISAN_BIN" ]; then
-  if [ -x "vendor/bin/sail" ]; then
-    ARTISAN_BIN="vendor/bin/sail artisan"
-  else
-    ARTISAN_BIN="php artisan"
-  fi
-fi
-
-# description オプションを条件付きで組み立てる
-DESCRIPTION_ARGS=()
 if [ -n "$DESCRIPTION" ]; then
-  DESCRIPTION_ARGS=(--description="$DESCRIPTION")
+    PAYLOAD=$(echo "$PAYLOAD" | jq --arg d "$DESCRIPTION" '. + {description: $d}')
 fi
 
-if [ "$ARTISAN_BIN" = "vendor/bin/sail artisan" ]; then
-  TMP_BASENAME="$(date +%s)-$(basename "$LATEST")"
-  TMP_HOST="$TMP_DIR/$TMP_BASENAME"
-  cp "$LATEST" "$TMP_HOST"
-  CONTAINER_FILE="$CONTAINER_ROOT/storage/app/plans-tmp/$TMP_BASENAME"
+RESPONSE=$(curl -sf -X POST \
+    -H "Authorization: Bearer $YOMITOKI_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$YOMITOKI_URL/api/scraps" \
+    -d "$PAYLOAD")
 
-  $ARTISAN_BIN plans:save \
-    --title="$TITLE" \
-    --slug="$SLUG" \
-    --file="$CONTAINER_FILE" \
-    --project="$PROJECT_NAME" \
-    --directory="$PROJECT_DIR" \
-    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
-
-  rm -f "$TMP_HOST"
-else
-  $ARTISAN_BIN plans:save \
-    --title="$TITLE" \
-    --slug="$SLUG" \
-    --file="$LATEST" \
-    --project="$PROJECT_NAME" \
-    --directory="$PROJECT_DIR" \
-    "${DESCRIPTION_ARGS[@]+"${DESCRIPTION_ARGS[@]}"}"
-fi
+SCRAP_SLUG=$(echo "$RESPONSE" | jq -r '.slug')
+SCRAP_ID=$(echo "$RESPONSE" | jq -r '.id')
+echo "✓ Plan saved: scrap #$SCRAP_ID \"$SCRAP_SLUG\""

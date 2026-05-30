@@ -133,3 +133,79 @@ test('summarize and embedding jobs are dispatched', function () {
     Queue::assertPushed(SummarizeScrapJob::class);
     Queue::assertPushed(GenerateScrapEmbeddingJob::class);
 });
+
+// --- parent_slug ---
+
+test('parent_slug creates child scrap', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    $parent = Scrap::factory()->for($user)->create(['slug' => 'parent-plan']);
+
+    $response = $this->withToken($token)
+        ->postJson('/api/scraps', [
+            'title' => 'Result',
+            'content_markdown' => '# Result',
+            'source_type' => 'execution',
+            'parent_slug' => 'parent-plan',
+        ]);
+
+    $response->assertCreated();
+    $child = Scrap::latest('id')->first();
+    expect($child->parent_id)->toBe($parent->id);
+});
+
+test('parent_slug from another user returns 422', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    Scrap::factory()->create(['slug' => 'other-plan']); // different user
+
+    $this->withToken($token)
+        ->postJson('/api/scraps', [
+            'title' => 'Result',
+            'content_markdown' => '# Result',
+            'parent_slug' => 'other-plan',
+        ])
+        ->assertUnprocessable();
+});
+
+// --- description ---
+
+test('description is saved as summary and skips SummarizeScrapJob', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson('/api/scraps', [
+            'title' => 'Test',
+            'content_markdown' => '# Test',
+            'description' => 'Short summary',
+        ]);
+
+    $scrap = Scrap::first();
+    expect($scrap->summary)->toBe('Short summary');
+    Queue::assertNotPushed(SummarizeScrapJob::class);
+    Queue::assertPushed(GenerateScrapEmbeddingJob::class);
+});
+
+// --- source_type execution ---
+
+test('source_type execution is accepted', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson('/api/scraps', [
+            'title' => 'Exec',
+            'content_markdown' => '# Exec',
+            'source_type' => 'execution',
+        ])
+        ->assertCreated();
+
+    expect(Scrap::first()->source_type)->toBe('execution');
+});

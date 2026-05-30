@@ -9,6 +9,7 @@ use App\Jobs\SummarizeScrapJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class IngestScrapController extends Controller
 {
@@ -17,6 +18,22 @@ class IngestScrapController extends Controller
         abort_unless($request->user()->currentAccessToken()?->can('ingest'), 403);
 
         $validated = $request->validated();
+
+        $parentId = null;
+        if (! empty($validated['parent_slug'])) {
+            $parent = Scrap::where('slug', $validated['parent_slug'])
+                ->where('user_id', $request->user()->id)
+                ->first();
+
+            if (! $parent) {
+                throw ValidationException::withMessages([
+                    'parent_slug' => ['No scrap found with the given slug.'],
+                ]);
+            }
+
+            $parentId = $parent->id;
+        }
+
         $resolvedSlug = $this->makeUniqueSlug(
             candidate: $validated['slug'] ?? null,
             fallbackTitle: $validated['title'],
@@ -24,11 +41,13 @@ class IngestScrapController extends Controller
 
         $scrap = Scrap::create([
             'user_id' => $request->user()->id,
+            'parent_id' => $parentId,
             'source_type' => $validated['source_type'] ?? 'plan',
             'title' => $validated['title'],
             'slug' => $resolvedSlug,
             'content' => $validated['content_markdown'],
             'content_markdown' => $validated['content_markdown'],
+            'summary' => $validated['description'] ?? null,
             'status' => 'processed',
             'occurred_at' => now(),
             'meta' => array_filter([
@@ -40,10 +59,12 @@ class IngestScrapController extends Controller
             ]),
         ]);
 
-        SummarizeScrapJob::dispatch($scrap->id);
-
         if (config('services.embedding.enabled', true)) {
             GenerateScrapEmbeddingJob::dispatch($scrap->id);
+        }
+
+        if (empty($validated['description'])) {
+            SummarizeScrapJob::dispatch($scrap->id);
         }
 
         return response()->json([

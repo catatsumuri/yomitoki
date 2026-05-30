@@ -3,27 +3,19 @@ set -euo pipefail
 
 # scrap-delete.sh — slug を指定して Scrap を削除する（子 Scrap も含む）
 #
-# Usage: scrap-delete.sh "{slug}" [project-dir]
-#   slug        : 削除対象のスラッグ（必須）
-#   project-dir : プロジェクトルートの絶対パス (default: 現在のディレクトリ)
-#
-# Note: 確認プロンプトなし（--force 固定）
+# Usage: scrap-delete.sh "{slug}"
 
-SLUG="${1:-}"
-PROJECT_DIR="${2:-$(pwd)}"
+SLUG="${1:?slug is required}"
 
-if [ -z "$SLUG" ]; then
-    echo "Error: slug argument is required" >&2
-    exit 1
+if [ -z "${YOMITOKI_URL:-}" ] || [ -z "${YOMITOKI_TOKEN:-}" ]; then
+    CONFIG="$HOME/.config/yomitoki/config"
+    [ -f "$CONFIG" ] && source "$CONFIG"
 fi
+: "${YOMITOKI_URL:?YOMITOKI_URL is not set.}"
+: "${YOMITOKI_TOKEN:?YOMITOKI_TOKEN is not set.}"
 
-ARTISAN_BIN=""
-cd "$PROJECT_DIR"
+curl -sf -X DELETE \
+    -H "Authorization: Bearer $YOMITOKI_TOKEN" \
+    "$YOMITOKI_URL/api/scraps/$SLUG"
 
-if [ -x "vendor/bin/sail" ]; then
-    ARTISAN_BIN="vendor/bin/sail artisan"
-else
-    ARTISAN_BIN="php artisan"
-fi
-
-$ARTISAN_BIN scraps:delete --slug="$SLUG" --force
+echo "✓ Deleted: $SLUG"

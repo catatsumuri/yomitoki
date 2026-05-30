@@ -101,6 +101,31 @@ class ScrapController extends Controller
         return response()->json($this->formatScrap($scrap->fresh()));
     }
 
+    public function related(Request $request, string $slug): JsonResponse
+    {
+        abort_unless($request->user()->currentAccessToken()?->can('ingest'), 403);
+
+        $scrap = Scrap::query()
+            ->where('slug', $slug)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $limit = min((int) ($request->query('limit', 5)), 20);
+
+        $data = $scrap->relatedScraps($limit)->map(fn (array $item) => [
+            'id' => $item['id'],
+            'slug' => $item['slug'],
+            'title' => $item['title'],
+            'source_type' => $item['sourceType'],
+            'status' => $item['status'],
+            'summary' => $item['summary'],
+            'similarity' => $item['similarity'],
+            'occurred_at' => $item['occurredAt'],
+        ])->values()->all();
+
+        return response()->json(['data' => $data]);
+    }
+
     public function destroy(Request $request, string $slug): JsonResponse
     {
         abort_unless($request->user()->currentAccessToken()?->can('ingest'), 403);
