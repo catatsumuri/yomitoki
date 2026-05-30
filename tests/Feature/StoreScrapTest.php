@@ -21,7 +21,6 @@ test('authenticated users can store scraps', function () {
             'title' => 'Rough dashboard thought',
             'slug' => 'rough-dashboard-thought',
             'content' => 'Put the writing box first and move review to the side.',
-            'organize' => true,
         ]);
 
     $scrap = Scrap::query()->first();
@@ -34,11 +33,10 @@ test('authenticated users can store scraps', function () {
     expect($scrap->title)->toBe('Rough dashboard thought');
     expect($scrap->slug)->toBe('rough-dashboard-thought');
     expect($scrap->content)->toContain('writing box first');
-    expect($scrap->meta)->toBe(['organize_requested' => true]);
     Queue::assertPushed(GenerateScrapEmbeddingJob::class, fn (GenerateScrapEmbeddingJob $job) => $job->scrapId === $scrap->id);
 
     $response->assertRedirect(route('dashboard.show', ['slug' => 'rough-dashboard-thought']));
-    $response->assertInertiaFlash('toast.message', 'Scrap saved. AI organization can be applied next.');
+    $response->assertInertiaFlash('toast.message', 'Scrap saved.');
 });
 
 test('title is optional when storing scraps', function () {
@@ -48,7 +46,6 @@ test('title is optional when storing scraps', function () {
         'title' => '',
         'slug' => '',
         'content' => 'A title can be inferred later.',
-        'organize' => false,
     ]);
 
     expect(Scrap::query()->first()?->title)->toBe('A title can be inferred later.');
@@ -66,7 +63,6 @@ test('authenticated users can store child scraps under their own scraps', functi
         'title' => 'Nested note',
         'slug' => 'nested-note',
         'content' => 'This belongs under the selected scrap.',
-        'organize' => false,
     ]);
 
     $childScrap = Scrap::query()
@@ -88,7 +84,6 @@ test('content is required when storing scraps', function () {
         ->post(route('scraps.store'), [
             'title' => 'Incomplete scrap',
             'content' => '',
-            'organize' => false,
         ]);
 
     $response->assertSessionHasErrors('content')
@@ -106,7 +101,6 @@ test('users cannot store child scraps under scraps they do not own', function ()
             'parent_id' => $parentScrap->id,
             'title' => 'Blocked child',
             'content' => 'Blocked content',
-            'organize' => false,
         ]);
 
     $response->assertSessionHasErrors('parent_id')
@@ -119,7 +113,6 @@ test('authenticated users can update their scraps', function () {
         'title' => 'Old title',
         'content' => 'Old content',
         'content_markdown' => 'Old content',
-        'meta' => ['organize_requested' => false],
     ]);
 
     $response = $this
@@ -128,7 +121,6 @@ test('authenticated users can update their scraps', function () {
             'title' => 'Updated title',
             'slug' => 'updated-title',
             'content' => '# Updated content',
-            'organize' => true,
         ]);
 
     $scrap->refresh();
@@ -137,11 +129,10 @@ test('authenticated users can update their scraps', function () {
     expect($scrap->slug)->toBe('updated-title');
     expect($scrap->content)->toBe('# Updated content');
     expect($scrap->content_markdown)->toBe('# Updated content');
-    expect($scrap->meta)->toBe(['organize_requested' => true]);
     Queue::assertPushed(GenerateScrapEmbeddingJob::class, fn (GenerateScrapEmbeddingJob $job) => $job->scrapId === $scrap->id);
 
     $response->assertRedirect(route('dashboard.show', ['slug' => 'updated-title']));
-    $response->assertInertiaFlash('toast.message', 'Scrap updated. AI organization can be applied next.');
+    $response->assertInertiaFlash('toast.message', 'Scrap updated.');
 });
 
 test('duplicate top level slugs are uniquified on store', function () {
@@ -155,7 +146,6 @@ test('duplicate top level slugs are uniquified on store', function () {
         'title' => 'GitHub pull request draft PR',
         'slug' => 'github-pull-request-draft-pr',
         'content' => 'A second scrap with the same suggested slug.',
-        'organize' => false,
     ]);
 
     $scrap = Scrap::query()
@@ -186,7 +176,6 @@ test('duplicate top level slugs are uniquified on update', function () {
             'title' => 'GitHub pull request draft PR',
             'slug' => 'github-pull-request-draft-pr',
             'content' => 'Updated content',
-            'organize' => false,
         ]);
 
     $scrap->refresh();
@@ -205,7 +194,6 @@ test('top level scraps get fallback title and slug from content when saved witho
         'title' => '',
         'slug' => '',
         'content' => 'Dashboard should always start from capture.',
-        'organize' => false,
     ]);
 
     $scrap = Scrap::query()->firstOrFail();
@@ -221,7 +209,6 @@ test('standalone uploaded asset markdown gets a compact fallback title and slug'
         'title' => '',
         'slug' => '',
         'content' => '![ee49d48159a5-20260511.webp](/images/scraps/1/ZLcnrjCtmBXo3OvdcobhSQjq5)',
-        'organize' => false,
     ]);
 
     $scrap = Scrap::query()->firstOrFail();
@@ -237,7 +224,6 @@ test('fallback titles are shortened to a compact length', function () {
         'title' => '',
         'slug' => '',
         'content' => 'This title should be compact even when the captured text keeps going with extra detail that does not belong in a one line heading.',
-        'organize' => false,
     ]);
 
     $scrap = Scrap::query()->firstOrFail();
@@ -255,7 +241,6 @@ test('users cannot update scraps they do not own', function () {
         ->patch(route('scraps.update', $scrap), [
             'title' => 'Blocked',
             'content' => 'Blocked content',
-            'organize' => false,
         ])
         ->assertForbidden();
 });
@@ -339,7 +324,6 @@ test('updating a child scrap redirects back to the parent scrap detail page', fu
         ->patch(route('scraps.update', $childScrap), [
             'title' => 'Updated child note',
             'content' => 'Updated child content',
-            'organize' => false,
         ]);
 
     $response->assertRedirect(route('dashboard.show', ['slug' => 'parent-detail']));

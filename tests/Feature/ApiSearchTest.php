@@ -3,6 +3,7 @@
 use App\Models\Scrap;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Embeddings;
 
 uses(RefreshDatabase::class);
@@ -30,6 +31,10 @@ test('search without q returns 422', function () {
 // --- Search ---
 
 test('search returns matching scraps with similarity', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Requires PostgreSQL with pgvector.');
+    }
+
     $vector = array_fill(0, 1024, 0.1);
     Embeddings::fake([[$vector]]);
 
@@ -89,6 +94,10 @@ test('search does not return archived scraps', function () {
 });
 
 test('search filters by source_type', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Requires PostgreSQL with pgvector.');
+    }
+
     $vector = array_fill(0, 1024, 0.1);
     Embeddings::fake([[$vector], [$vector]]);
 
@@ -106,6 +115,10 @@ test('search filters by source_type', function () {
 });
 
 test('search with include=content returns content_markdown', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Requires PostgreSQL with pgvector.');
+    }
+
     $vector = array_fill(0, 1024, 0.1);
     Embeddings::fake([[$vector]]);
 
@@ -169,6 +182,10 @@ test('related returns 404 for unknown slug', function () {
 });
 
 test('related returns related scraps', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Requires PostgreSQL with pgvector.');
+    }
+
     $vector = array_fill(0, 1024, 0.1);
 
     $user = User::factory()->create();

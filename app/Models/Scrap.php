@@ -64,6 +64,11 @@ class Scrap extends Model
             ->orderBy('id');
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(ScrapRevision::class)->latest();
+    }
+
     /**
      * Get parent scraps similar to this one using pgvector cosine distance.
      *

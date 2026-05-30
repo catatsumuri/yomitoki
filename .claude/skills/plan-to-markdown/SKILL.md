@@ -31,6 +31,9 @@ bash <skill-dir>/scripts/save-plan.sh "{plan-title-slug}" "{project-dir}" "{desc
 - プランモード中（ExitPlanMode 呼び出し前）は書き込み禁止のため、スクリプトは必ず承認後に実行すること
 - プランを承認したターンの最初の行動として実行すること
 
+**保証について：**
+このスキルの発動は AI の判断ベースであり、発動されない場合がある。確実に実行したい場合は `settings.json` の `PostToolUse` フックに `ExitPlanMode` を検知するエントリを追加すること。フック設定は `update-config` スキルで行える。
+
 ## Output
 
 ```

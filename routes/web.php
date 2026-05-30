@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\ScrapController;
+use App\Http\Controllers\ScrapRevisionsController;
 use App\Http\Controllers\ScrapsController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Http\Request;
@@ -26,6 +27,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('scraps', [ScrapController::class, 'store'])->name('scraps.store');
     Route::patch('scraps/{scrap}', [ScrapController::class, 'update'])->name('scraps.update');
     Route::post('scraps/bulk-archive', [ScrapController::class, 'bulkArchive'])->name('scraps.bulk-archive');
+    Route::delete('scraps/bulk-destroy', [ScrapController::class, 'bulkDestroy'])->name('scraps.bulk-destroy');
+    Route::post('scraps/{scrap}/refine-markdown', [ScrapController::class, 'refineMarkdown'])->name('scraps.refine-markdown');
     Route::post('scraps/{scrap}/archive', [ScrapController::class, 'archive'])->name('scraps.archive');
     Route::post('scraps/{scrap}/restore', [ScrapController::class, 'restore'])->name('scraps.restore');
     Route::delete('scraps/{scrap}', [ScrapController::class, 'destroy'])->name('scraps.destroy');
@@ -35,6 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('scraps/{scrap}/backup', [BackupController::class, 'backupScrap'])->name('scraps.backup');
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/{slug}', [DashboardController::class, 'show'])->name('dashboard.show');
+    Route::get('dashboard/{slug}/revisions', [ScrapRevisionsController::class, 'show'])->name('dashboard.revisions');
     Route::get('scraps', [ScrapsController::class, 'index'])->name('scraps');
     Route::get('scraps/{slug}', [ScrapsController::class, 'show'])->name('scraps.show');
     Route::get('documents', [DocumentController::class, 'index'])->name('documents');

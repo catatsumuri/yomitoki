@@ -30,7 +30,7 @@ export default function AiSettings({ provider }: Props) {
         setLog([]);
         setOk(null);
 
-        const url = ping.url({ prompt: trimmed });
+        const url = ping.url({ query: { prompt: trimmed } });
         const source = new EventSource(url);
         let finished = false;
 

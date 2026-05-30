@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ImportScrapController;
 use App\Http\Controllers\Api\IngestScrapController;
 use App\Http\Controllers\Api\ScrapController;
 use App\Http\Controllers\Api\ScrapSearchController;
@@ -9,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('skills/install', SkillsInstallController::class)->name('api.skills.install');
     Route::get('search', ScrapSearchController::class)->name('api.search');
+    Route::post('scraps/import', ImportScrapController::class)->name('api.scraps.import');
     Route::post('scraps', IngestScrapController::class)->name('api.scraps.store');
     Route::get('scraps', [ScrapController::class, 'index'])->name('api.scraps.index');
     Route::get('scraps/{slug}', [ScrapController::class, 'show'])->name('api.scraps.show')->where('slug', '[a-z0-9-]+');

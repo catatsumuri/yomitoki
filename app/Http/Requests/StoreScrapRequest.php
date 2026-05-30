@@ -36,8 +36,10 @@ class StoreScrapRequest extends FormRequest
                 'max:255',
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
             ],
-            'content' => ['required', 'string', 'max:10000'],
-            'organize' => ['required', 'boolean'],
+            'content' => ['required', 'string'],
+            'summary' => ['nullable', 'string', 'max:500'],
+            'tags' => ['nullable', 'array', 'max:20'],
+            'tags.*' => ['string', 'max:50'],
         ];
     }
 }

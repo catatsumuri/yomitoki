@@ -6,7 +6,7 @@ import {
     router,
     setLayoutProps,
     useForm,
-    useHttp,
+    usePoll,
 } from '@inertiajs/react';
 import {
     Archive,
@@ -15,17 +15,21 @@ import {
     CirclePlus,
     CornerDownLeft,
     Download,
+    History,
+    Loader2,
     PencilLine,
     RotateCcw,
-    Sparkles,
     Undo2,
+    Wand2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
+import { show as scrapRevisionsShow } from '@/actions/App/Http/Controllers/ScrapRevisionsController';
 import InputError from '@/components/input-error';
 import { MarkdownPreview } from '@/components/markdown-preview';
 import { ScrapCard } from '@/components/scrap-card';
+import { TagInput } from '@/components/tag-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -109,6 +113,7 @@ type DashboardProps = {
 type SuggestedMetadata = {
     title: string;
     slug: string;
+    summary: string;
 };
 
 function buildFallbackTitle(content: string, currentTitle: string): string {
@@ -191,13 +196,11 @@ export default function Dashboard({
         'recent',
     );
     const [showMobileRecent, setShowMobileRecent] = useState(false);
-    const [pendingOrganize, setPendingOrganize] = useState<boolean | null>(
-        null,
-    );
     const [suggestedMetadata, setSuggestedMetadata] =
         useState<SuggestedMetadata>({
             title: '',
             slug: '',
+            summary: '',
         });
     const recentScraps = inboxItems.data;
     const isArchivedView = activeStatus === 'archived';
@@ -235,11 +238,7 @@ export default function Dashboard({
     }
 
     function visitTag(tag: string | null): void {
-        router.visit(
-            selectedScrap?.slug
-                ? workspaceShow(selectedScrap.slug, routeQuery(tag))
-                : workspaceIndex(routeQuery(tag)),
-        );
+        router.visit(workspaceIndex(routeQuery(tag)));
     }
 
     function visitStatus(status: 'active' | 'archived'): void {
@@ -274,9 +273,19 @@ export default function Dashboard({
     const form = useForm({
         title: '',
         slug: '',
+        summary: '',
+        tags: [] as string[],
         content: '',
     });
     const archiveForm = useForm({});
+    const refineForm = useForm({});
+    const [isRefining, setIsRefining] = useState(false);
+    const refiningContentRef = useRef<string | null>(null);
+    const { start: startRefinePoll, stop: stopRefinePoll } = usePoll(
+        2000,
+        { only: ['selectedScrap'] },
+        { autoStart: false },
+    );
     const nextUploadKeyRef = useRef(1);
     const pendingUploadRef = useRef<{
         key: string;
@@ -287,23 +296,7 @@ export default function Dashboard({
     } | null>(null);
     const mainTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const childTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const suggestionRequest = useHttp<
-        {
-            title: string;
-            slug: string;
-            content: string;
-            parent_id: number | null;
-            scrap_id: number | null;
-        },
-        { title: string | null; slug: string | null }
-    >(() => ({
-        title: form.data.title,
-        slug: form.data.slug,
-        content: form.data.content,
-        parent_id:
-            selectedScrap && !isEditingSelected ? selectedScrap.id : null,
-        scrap_id: selectedScrap && isEditingSelected ? selectedScrap.id : null,
-    }));
+    const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
 
     // Inertia reuses this page component between visits, so the editor needs to
     // resync its local UI state from the latest server payload after navigation.
@@ -315,7 +308,6 @@ export default function Dashboard({
         setShowMainMetaFields(false);
         setShowChildMetaFields(false);
         setIsSuggestionDialogOpen(false);
-        setPendingOrganize(null);
         setRightPanelTab('recent');
         form.resetAndClearErrors();
     }, [initialSelectedScrap]);
@@ -344,11 +336,25 @@ export default function Dashboard({
             form.setData({
                 title: refreshedSelection.title ?? '',
                 slug: refreshedSelection.slug ?? '',
+                summary: refreshedSelection.summary ?? '',
+                tags: refreshedSelection.tags ?? [],
                 content: refreshedSelection.content,
             });
         }
     }, [recentScraps, selectedScrap?.id, isEditingSelected]);
     /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+
+    useEffect(() => {
+        if (!isRefining || refiningContentRef.current === null) {
+            return;
+        }
+
+        if (initialSelectedScrap?.content !== refiningContentRef.current) {
+            stopRefinePoll();
+            setIsRefining(false);
+            refiningContentRef.current = null;
+        }
+    }, [initialSelectedScrap?.content, isRefining, stopRefinePoll]);
 
     function beginNewScrap(): void {
         if (isArchivedView) {
@@ -369,7 +375,6 @@ export default function Dashboard({
         setShowMainMetaFields(false);
         setShowChildMetaFields(false);
         setIsSuggestionDialogOpen(false);
-        setPendingOrganize(null);
         form.reset();
         form.clearErrors();
     }
@@ -381,7 +386,6 @@ export default function Dashboard({
         setShowMainMetaFields(false);
         setShowChildMetaFields(false);
         setIsSuggestionDialogOpen(false);
-        setPendingOrganize(null);
         form.resetAndClearErrors();
     }
 
@@ -393,11 +397,17 @@ export default function Dashboard({
         setIsEditingSelected(true);
         setEditorMode('write');
         setShowMainMetaFields(
-            Boolean(selectedScrap.title || selectedScrap.slug),
+            Boolean(
+                selectedScrap.title ||
+                selectedScrap.slug ||
+                selectedScrap.tags.length,
+            ),
         );
         form.setData({
             title: selectedScrap.title ?? '',
             slug: selectedScrap.slug ?? '',
+            summary: selectedScrap.summary ?? '',
+            tags: selectedScrap.tags ?? [],
             content: selectedScrap.content,
         });
         form.clearErrors();
@@ -414,7 +424,6 @@ export default function Dashboard({
         setEditorMode('write');
         setShowMainMetaFields(false);
         setIsSuggestionDialogOpen(false);
-        setPendingOrganize(null);
         form.resetAndClearErrors();
     }
 
@@ -561,10 +570,7 @@ export default function Dashboard({
         }
     }
 
-    function persistScrap(
-        organize: boolean,
-        overrides?: Partial<typeof form.data>,
-    ): void {
+    function persistScrap(overrides?: Partial<typeof form.data>): void {
         const isEditingExistingScrap =
             isEditingSelected && selectedScrap !== null;
         const parentScrap = !isEditingSelected ? selectedScrap : null;
@@ -575,7 +581,6 @@ export default function Dashboard({
 
         form.transform(() => ({
             ...nextData,
-            organize,
             parent_id: isEditingExistingScrap
                 ? null
                 : (parentScrap?.id ?? null),
@@ -593,7 +598,6 @@ export default function Dashboard({
                             setEditorMode('write');
                             setShowChildMetaFields(false);
                             setIsSuggestionDialogOpen(false);
-                            setPendingOrganize(null);
                             form.resetAndClearErrors();
 
                             return;
@@ -607,7 +611,6 @@ export default function Dashboard({
                     setIsEditingSelected(false);
                     setEditorMode('write');
                     setIsSuggestionDialogOpen(false);
-                    setPendingOrganize(null);
                     form.clearErrors();
                 },
             },
@@ -623,27 +626,61 @@ export default function Dashboard({
               ? selectedScrap.parentId === null
               : false;
 
-    async function handleSave(organize: boolean): Promise<void> {
+    async function handleSave(): Promise<void> {
         const missingTitle = form.data.title.trim() === '';
         const missingSlug =
             shouldSuggestSlugForCurrentSave && form.data.slug.trim() === '';
 
         if (!missingTitle && !missingSlug) {
-            persistScrap(organize);
+            persistScrap();
 
             return;
         }
 
         try {
-            const response = await suggestionRequest.submit(
-                ScrapController.suggestMetadata(),
-            );
+            setIsSuggestionLoading(true);
+            const res = await fetch(ScrapController.suggestMetadata().url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        (
+                            document.querySelector(
+                                'meta[name="csrf-token"]',
+                            ) as HTMLMetaElement
+                        )?.content ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    title: form.data.title,
+                    slug: form.data.slug,
+                    content: form.data.content,
+                    parent_id:
+                        selectedScrap && !isEditingSelected
+                            ? selectedScrap.id
+                            : null,
+                    scrap_id:
+                        selectedScrap && isEditingSelected
+                            ? selectedScrap.id
+                            : null,
+                }),
+            });
+
+            if (!res.ok) {
+                throw new Error(`${res.status}`);
+            }
+
+            const response = (await res.json()) as {
+                title: string | null;
+                slug: string | null;
+                summary: string | null;
+            };
 
             setSuggestedMetadata({
                 title: response.title ?? '',
                 slug: response.slug ?? '',
+                summary: response.summary ?? '',
             });
-            setPendingOrganize(organize);
             setIsSuggestionDialogOpen(true);
         } catch {
             const fallbackTitle = buildFallbackTitle(
@@ -656,19 +693,18 @@ export default function Dashboard({
                 slug: shouldSuggestSlugForCurrentSave
                     ? buildFallbackSlug(fallbackTitle, form.data.slug)
                     : '',
+                summary: form.data.summary,
             });
-            setPendingOrganize(organize);
             setIsSuggestionDialogOpen(true);
+        } finally {
+            setIsSuggestionLoading(false);
         }
     }
 
     function applySuggestionsAndSave(): void {
-        if (pendingOrganize === null) {
-            return;
-        }
-
         const overrides: Partial<typeof form.data> = {
             title: suggestedMetadata.title,
+            summary: suggestedMetadata.summary,
         };
 
         if (shouldSuggestSlugForCurrentSave) {
@@ -680,7 +716,7 @@ export default function Dashboard({
             ...overrides,
         }));
         setIsSuggestionDialogOpen(false);
-        persistScrap(pendingOrganize, overrides);
+        persistScrap(overrides);
     }
 
     return (
@@ -689,12 +725,8 @@ export default function Dashboard({
             <Dialog
                 open={isSuggestionDialogOpen}
                 onOpenChange={(open) => {
-                    if (!suggestionRequest.processing) {
+                    if (!isSuggestionLoading) {
                         setIsSuggestionDialogOpen(open);
-
-                        if (!open) {
-                            setPendingOrganize(null);
-                        }
                     }
                 }}
             >
@@ -748,6 +780,22 @@ export default function Dashboard({
                                 />
                             </div>
                         )}
+                        <div className="space-y-2">
+                            <Label htmlFor="suggested-summary">
+                                {__('Summary')}
+                            </Label>
+                            <textarea
+                                id="suggested-summary"
+                                value={suggestedMetadata.summary}
+                                onChange={(event) =>
+                                    setSuggestedMetadata((current) => ({
+                                        ...current,
+                                        summary: event.target.value,
+                                    }))
+                                }
+                                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>
@@ -755,7 +803,6 @@ export default function Dashboard({
                             variant="secondary"
                             onClick={() => {
                                 setIsSuggestionDialogOpen(false);
-                                setPendingOrganize(null);
                             }}
                         >
                             {__('Cancel')}
@@ -979,7 +1026,7 @@ export default function Dashboard({
                                               )}
                                     </CardDescription>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex shrink-0 flex-wrap items-center gap-2">
                                     {(!selectedScrap || isEditingSelected) && (
                                         <div className="flex shrink-0 rounded-xl border border-border/70 bg-background p-1">
                                             <button
@@ -1010,47 +1057,103 @@ export default function Dashboard({
                                             </button>
                                         </div>
                                     )}
-                                    {isEditingSelected && (
-                                        <Button
-                                            variant="outline"
-                                            disabled={
-                                                form.processing ||
-                                                archiveForm.processing
-                                            }
-                                            onClick={cancelEditSelectedScrap}
-                                        >
-                                            <Undo2 className="size-4" />
-                                            {__('Cancel')}
-                                        </Button>
-                                    )}
                                     {selectedScrap && !isEditingSelected && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={beginNewScrap}
-                                        >
-                                            <PencilLine className="size-4" />
-                                            {__('New scrap')}
-                                        </Button>
-                                    )}
-                                    {selectedScrap && !isEditingSelected && (
-                                        <Button
-                                            onClick={beginEditSelectedScrap}
-                                        >
-                                            <PencilLine className="size-4" />
-                                            {__('Edit this scrap')}
-                                        </Button>
-                                    )}
-                                    {selectedScrap && !isEditingSelected && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => {
-                                                setBackupDescription('');
-                                                setIsBackupDialogOpen(true);
-                                            }}
-                                        >
-                                            <Download className="size-4" />
-                                            {__('Create backup')}
-                                        </Button>
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={beginNewScrap}
+                                                >
+                                                    <PencilLine className="size-4" />
+                                                    {__('New scrap')}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={
+                                                        beginEditSelectedScrap
+                                                    }
+                                                >
+                                                    <PencilLine className="size-4" />
+                                                    {__('Edit')}
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        refineForm.processing ||
+                                                        isRefining
+                                                    }
+                                                    onClick={() => {
+                                                        refiningContentRef.current =
+                                                            selectedScrap.content;
+                                                        refineForm.submit(
+                                                            ScrapController.refineMarkdown(
+                                                                selectedScrap.id,
+                                                            ),
+                                                            {
+                                                                preserveScroll: true,
+                                                                onSuccess:
+                                                                    () => {
+                                                                        setIsRefining(
+                                                                            true,
+                                                                        );
+                                                                        startRefinePoll();
+                                                                    },
+                                                            },
+                                                        );
+                                                    }}
+                                                >
+                                                    {isRefining ? (
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                    ) : (
+                                                        <Wand2 className="size-4" />
+                                                    )}
+                                                    {isRefining
+                                                        ? __('Refining…')
+                                                        : __('Refine Markdown')}
+                                                </Button>
+                                            </div>
+                                            <div className="flex items-center gap-1 rounded-xl border border-border/50 bg-muted/30 px-1 py-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                                                    onClick={() => {
+                                                        setBackupDescription(
+                                                            '',
+                                                        );
+                                                        setIsBackupDialogOpen(
+                                                            true,
+                                                        );
+                                                    }}
+                                                    title={__('Create backup')}
+                                                >
+                                                    <Download className="size-4" />
+                                                </Button>
+                                                {selectedScrap.slug && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={
+                                                                scrapRevisionsShow(
+                                                                    selectedScrap.slug,
+                                                                ).url
+                                                            }
+                                                            title={__(
+                                                                'History',
+                                                            )}
+                                                        >
+                                                            <History className="size-4" />
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -1065,6 +1168,40 @@ export default function Dashboard({
                                                     selectedScrap.sourceType
                                                 ] ?? selectedScrap.sourceType}
                                             </Badge>
+                                            {selectedScrap.tags.map((tag) => (
+                                                <button
+                                                    key={tag}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        router.visit(
+                                                            selectedScrap.slug
+                                                                ? workspaceShow(
+                                                                      selectedScrap.slug,
+                                                                      routeQuery(
+                                                                          tag,
+                                                                      ),
+                                                                  )
+                                                                : workspaceIndex(
+                                                                      routeQuery(
+                                                                          tag,
+                                                                      ),
+                                                                  ),
+                                                        )
+                                                    }
+                                                    className="inline-flex items-center"
+                                                >
+                                                    <Badge
+                                                        variant={
+                                                            activeTag === tag
+                                                                ? 'default'
+                                                                : 'secondary'
+                                                        }
+                                                        className="cursor-pointer transition-colors hover:bg-primary hover:text-primary-foreground"
+                                                    >
+                                                        #{tag}
+                                                    </Badge>
+                                                </button>
+                                            ))}
                                             <span className="text-xs text-muted-foreground">
                                                 <DateDisplay
                                                     value={
@@ -1284,23 +1421,22 @@ export default function Dashboard({
 
                                             <div className="flex flex-wrap gap-2">
                                                 <Button
-                                                    disabled={form.processing}
-                                                    onClick={() =>
-                                                        handleSave(false)
+                                                    disabled={
+                                                        form.processing ||
+                                                        isSuggestionLoading
                                                     }
+                                                    onClick={() => handleSave()}
                                                 >
-                                                    <CornerDownLeft className="size-4" />
-                                                    {__('Save child scrap')}
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    disabled={form.processing}
-                                                    onClick={() =>
-                                                        handleSave(true)
-                                                    }
-                                                >
-                                                    <Sparkles className="size-4" />
-                                                    {__('Save and organize')}
+                                                    {isSuggestionLoading ? (
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                    ) : (
+                                                        <CornerDownLeft className="size-4" />
+                                                    )}
+                                                    {isSuggestionLoading
+                                                        ? __('Thinking…')
+                                                        : __(
+                                                              'Save child scrap',
+                                                          )}
                                                 </Button>
                                             </div>
                                         </div>
@@ -1562,6 +1698,57 @@ export default function Dashboard({
                                                         />
                                                     </div>
                                                 )}
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="scrap-summary">
+                                                        {__('Summary')}
+                                                        <span className="ml-1.5 text-xs text-muted-foreground">
+                                                            (
+                                                            {__(
+                                                                'AI generates if blank',
+                                                            )}
+                                                            )
+                                                        </span>
+                                                    </Label>
+                                                    <textarea
+                                                        id="scrap-summary"
+                                                        value={
+                                                            form.data.summary
+                                                        }
+                                                        onChange={(event) =>
+                                                            form.setData(
+                                                                'summary',
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        placeholder={__(
+                                                            'A short description of this scrap.',
+                                                        )}
+                                                        className="min-h-20 w-full rounded-2xl border border-input bg-transparent px-4 py-3 text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            form.errors.summary
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>{__('Tags')}</Label>
+                                                    <TagInput
+                                                        value={form.data.tags}
+                                                        onChange={(tags) =>
+                                                            form.setData(
+                                                                'tags',
+                                                                tags,
+                                                            )
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            form.errors.tags
+                                                        }
+                                                    />
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -1587,7 +1774,7 @@ export default function Dashboard({
                                                 }
                                                 onPaste={handleBodyPaste}
                                                 placeholder={__(
-                                                    'Write in Markdown. Drag & drop images or files to attach.',
+                                                    'Write in Markdown. Drag & drop images or files to attach. Tags, priority and summary can be inferred by AI after saving.',
                                                 )}
                                                 className="min-h-72 w-full rounded-2xl border border-input bg-transparent px-4 py-4 font-mono text-sm leading-6 shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                                             />
@@ -1614,44 +1801,44 @@ export default function Dashboard({
                                     </div>
 
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <Button
                                                 size="lg"
                                                 className="min-w-36"
                                                 disabled={
                                                     form.processing ||
-                                                    archiveForm.processing
+                                                    archiveForm.processing ||
+                                                    isSuggestionLoading
                                                 }
-                                                onClick={() =>
-                                                    handleSave(false)
-                                                }
+                                                onClick={() => handleSave()}
                                             >
-                                                <CornerDownLeft className="size-4" />
-                                                {selectedScrap
-                                                    ? __('Save changes')
-                                                    : __('Save scrap')}
+                                                {isSuggestionLoading ? (
+                                                    <Loader2 className="size-4 animate-spin" />
+                                                ) : (
+                                                    <CornerDownLeft className="size-4" />
+                                                )}
+                                                {isSuggestionLoading
+                                                    ? __('Thinking…')
+                                                    : selectedScrap
+                                                      ? __('Save changes')
+                                                      : __('Save scrap')}
                                             </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="lg"
-                                                className="min-w-40"
-                                                disabled={
-                                                    form.processing ||
-                                                    archiveForm.processing
-                                                }
-                                                onClick={() => handleSave(true)}
-                                            >
-                                                <Sparkles className="size-4" />
-                                                {selectedScrap
-                                                    ? __('Save and organize')
-                                                    : __('AI organize on save')}
-                                            </Button>
-                                        </div>
-                                        <p className="text-xs leading-5 text-muted-foreground">
-                                            {__(
-                                                'Type, tags, priority, and summary can be inferred later through structured output. Paste images or drop and upload files to insert Markdown automatically.',
+                                            {isEditingSelected && (
+                                                <Button
+                                                    variant="ghost"
+                                                    disabled={
+                                                        form.processing ||
+                                                        archiveForm.processing
+                                                    }
+                                                    onClick={
+                                                        cancelEditSelectedScrap
+                                                    }
+                                                >
+                                                    <Undo2 className="size-4" />
+                                                    {__('Cancel')}
+                                                </Button>
                                             )}
-                                        </p>
+                                        </div>
                                     </div>
                                 </>
                             )}

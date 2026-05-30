@@ -8,6 +8,8 @@ use App\Http\Requests\SuggestScrapMetadataRequest;
 use App\Http\Requests\UpdateScrapRequest;
 use App\Http\Requests\UploadScrapImageRequest;
 use App\Jobs\GenerateScrapEmbeddingJob;
+use App\Jobs\GenerateScrapSummaryJob;
+use App\Jobs\RefineScrapMarkdownJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,8 +57,10 @@ class ScrapController extends Controller
             shouldSuggestSlug: $shouldSuggestSlug,
         ));
 
+        $data = $response->toArray();
+
         $suggestedTitle = $this->normalizeSuggestedTitle(
-            $response['title'] ?? null,
+            $data['title'] ?? null,
             $validated['content'],
         );
 
@@ -64,11 +68,12 @@ class ScrapController extends Controller
             'title' => $suggestedTitle,
             'slug' => $shouldSuggestSlug
                 ? $this->makeUniqueSlug(
-                    candidate: $response['slug'] ?? null,
+                    candidate: $data['slug'] ?? null,
                     fallbackTitle: $suggestedTitle,
                     ignoreScrapId: $currentScrap?->id,
                 )
                 : null,
+            'summary' => blank($data['summary'] ?? null) ? null : $data['summary'],
         ]);
     }
 
@@ -99,6 +104,9 @@ class ScrapController extends Controller
             )
             : null;
 
+        $summary = blank($validated['summary'] ?? null) ? null : $validated['summary'];
+        $tags = collect($validated['tags'] ?? [])->filter()->values()->all();
+
         $scrap = Scrap::create([
             'user_id' => $request->user()->id,
             'parent_id' => $validated['parent_id'] ?? null,
@@ -108,20 +116,22 @@ class ScrapController extends Controller
             'slug' => $resolvedSlug,
             'content' => $validated['content'],
             'content_markdown' => $validated['content'],
+            'summary' => $summary,
             'status' => 'raw',
             'occurred_at' => now(),
-            'meta' => [
-                'organize_requested' => (bool) $validated['organize'],
-            ],
+            'meta' => ['tags' => $tags],
         ]);
 
         GenerateScrapEmbeddingJob::dispatch($scrap->id);
+
+        if ($summary === null) {
+            GenerateScrapSummaryJob::dispatch($scrap->id);
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $this->buildSuccessMessage(
                 action: 'saved',
-                organize: (bool) $validated['organize'],
                 requestedSlug: $requestedSlug,
                 resolvedSlug: $resolvedSlug,
             ),
@@ -157,24 +167,31 @@ class ScrapController extends Controller
             )
             : null;
 
+        $summary = blank($validated['summary'] ?? null) ? null : $validated['summary'];
+        $tags = collect($validated['tags'] ?? [])->filter()->values()->all();
+
         $scrap->update([
             'title' => $resolvedTitle,
             'slug' => $resolvedSlug,
             'content' => $validated['content'],
             'content_markdown' => $validated['content'],
+            'summary' => $summary,
             'meta' => [
                 ...($scrap->meta ?? []),
-                'organize_requested' => (bool) $validated['organize'],
+                'tags' => $tags,
             ],
         ]);
 
         GenerateScrapEmbeddingJob::dispatch($scrap->id);
 
+        if ($summary === null) {
+            GenerateScrapSummaryJob::dispatch($scrap->id);
+        }
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $this->buildSuccessMessage(
                 action: 'updated',
-                organize: (bool) $validated['organize'],
                 requestedSlug: $requestedSlug,
                 resolvedSlug: $resolvedSlug,
             ),
@@ -222,6 +239,60 @@ class ScrapController extends Controller
         ]);
 
         return redirect()->route('scraps');
+    }
+
+    /**
+     * Permanently delete multiple archived scraps in one request.
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = array_values(array_filter(array_map('intval', $request->array('ids'))));
+        $user = $request->user();
+
+        $scraps = Scrap::query()
+            ->where('user_id', $user->id)
+            ->whereIn('id', $ids)
+            ->whereNull('parent_id')
+            ->where('status', 'archived')
+            ->get();
+
+        if ($scraps->isEmpty()) {
+            return redirect()->route('scraps', ['status' => 'archived']);
+        }
+
+        $allIdsToDelete = $scraps
+            ->flatMap(fn (Scrap $scrap) => $this->collectScrapTreeIds($scrap))
+            ->unique()
+            ->values()
+            ->all();
+
+        Scrap::query()
+            ->whereIn('id', $allIdsToDelete)
+            ->delete();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __(':count scraps permanently deleted.', ['count' => $scraps->count()]),
+        ]);
+
+        return redirect()->route('scraps', ['status' => 'archived']);
+    }
+
+    /**
+     * Dispatch an AI job to refine the scrap's content as clean Markdown.
+     */
+    public function refineMarkdown(Request $request, Scrap $scrap): RedirectResponse
+    {
+        abort_unless($scrap->user_id === $request->user()->id, 403);
+
+        RefineScrapMarkdownJob::dispatch($scrap->id);
+
+        Inertia::flash('toast', [
+            'type' => 'info',
+            'message' => __('Markdown refinement queued. The scrap will be updated shortly.'),
+        ]);
+
+        return redirect()->back();
     }
 
     /**
@@ -353,6 +424,9 @@ Current title:
 
 Current slug:
 {($currentSlug ?: '(none)')}
+
+Current summary:
+(none — generate a new one)
 
 Content:
 {$content}
@@ -514,16 +588,10 @@ TEXT;
      */
     private function buildSuccessMessage(
         string $action,
-        bool $organize,
         ?string $requestedSlug,
         ?string $resolvedSlug,
     ): string {
-        $message = match (true) {
-            $action === 'saved' && $organize => __('Scrap saved. AI organization can be applied next.'),
-            $action === 'updated' && $organize => __('Scrap updated. AI organization can be applied next.'),
-            $action === 'updated' => __('Scrap updated.'),
-            default => __('Scrap saved.'),
-        };
+        $message = $action === 'updated' ? __('Scrap updated.') : __('Scrap saved.');
 
         if (
             $requestedSlug !== null

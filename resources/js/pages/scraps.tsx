@@ -6,19 +6,29 @@ import {
     router,
     setLayoutProps,
 } from '@inertiajs/react';
-import { ArchiveIcon, FileTextIcon, HardDriveDownloadIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import {
+    ArchiveIcon,
+    FileTextIcon,
+    HardDriveDownloadIcon,
+    Trash2Icon,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DateDisplay } from '@/components/date-display';
 import { MarkdownPreview } from '@/components/markdown-preview';
+import { TableOfContents } from '@/components/table-of-contents';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { extractMarkdownHeadings } from '@/lib/markdown-headings';
 import { toneForStatus } from '@/lib/scrap-utils';
 import { scraps as scrapsRoute } from '@/routes';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
 import { compose as documentsCompose } from '@/routes/documents';
 import { show as scrapsShow } from '@/routes/scraps';
-import { bulkArchive as scrapsBulkArchive } from '@/routes/scraps';
+import {
+    bulkArchive as scrapsBulkArchive,
+    bulkDestroy as scrapsBulkDestroy,
+} from '@/routes/scraps';
 
 type Scrap = {
     id: number;
@@ -105,6 +115,7 @@ export default function Articles({
     const headerRef = useRef<HTMLDivElement>(null);
     const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
     const [isArchiving, setIsArchiving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [bulkBackup, setBulkBackup] = useState<BulkBackupState>({
         phase: 'idle',
@@ -227,6 +238,20 @@ export default function Articles({
         );
     }
 
+    function bulkDestroy(): void {
+        const ids = [...checkedIds];
+
+        if (ids.length === 0 || isDeleting) {
+            return;
+        }
+
+        setIsDeleting(true);
+        router.delete(scrapsBulkDestroy().url, {
+            data: { ids },
+            onFinish: () => setIsDeleting(false),
+        });
+    }
+
     function generateDocument(): void {
         const ids = [...checkedIds];
 
@@ -342,6 +367,20 @@ export default function Articles({
     }
 
     // ── Detail view ────────────────────────────────────────────────────────
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const scrapHeadingPrefix = selectedScrap ? `scrap-${selectedScrap.id}` : '';
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const scrapHeadings = useMemo(
+        () =>
+            selectedScrap?.content
+                ? extractMarkdownHeadings(
+                      selectedScrap.content,
+                      scrapHeadingPrefix,
+                  )
+                : [],
+        [selectedScrap?.id, selectedScrap?.content],
+    );
+
     if (selectedScrap) {
         return (
             <>
@@ -359,107 +398,142 @@ export default function Articles({
                         </Link>
                     </div>
 
-                    <div className="mx-auto w-full max-w-3xl space-y-6">
-                        <div className="space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                    variant={toneForStatus(
-                                        selectedScrap.status,
-                                    )}
-                                >
-                                    {statusLabels[selectedScrap.status] ??
-                                        selectedScrap.status}
-                                </Badge>
-                                <Badge variant="outline">
-                                    {sourceLabels[selectedScrap.sourceType] ??
-                                        selectedScrap.sourceType}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                    <DateDisplay
-                                        value={selectedScrap.occurredAt}
-                                    />
-                                </span>
-                            </div>
-
-                            {selectedScrap.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedScrap.tags.map((tag) => (
-                                        <Badge key={tag} variant="outline">
-                                            #{tag}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            )}
-
-                            <h1 className="text-2xl font-bold text-foreground">
-                                {selectedScrap.title ?? __('Untitled scrap')}
-                            </h1>
-                        </div>
-
-                        <div className="rounded-2xl border border-border/70 bg-background/70 p-6">
-                            <MarkdownPreview content={selectedScrap.content} />
-                        </div>
-
-                        {selectedScrap.children.length > 0 && (
-                            <div className="space-y-3">
-                                <h2 className="text-sm font-medium text-foreground">
-                                    {__('Child scraps')}
-                                    <span className="ml-2 text-muted-foreground">
-                                        {__(':count linked', {
-                                            count: selectedScrap.children
-                                                .length,
-                                        })}
-                                    </span>
-                                </h2>
+                    <div className="mx-auto w-full max-w-5xl">
+                        <div
+                            className={
+                                scrapHeadings.length > 0
+                                    ? 'lg:grid lg:grid-cols-[1fr_220px] lg:gap-8'
+                                    : ''
+                            }
+                        >
+                            <div className="space-y-6">
                                 <div className="space-y-3">
-                                    {selectedScrap.children.map((child) => (
-                                        <div
-                                            key={child.id}
-                                            className="rounded-2xl border border-border/70 bg-background/60 p-4"
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge
+                                            variant={toneForStatus(
+                                                selectedScrap.status,
+                                            )}
                                         >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <p className="font-medium text-foreground">
-                                                        {child.title ??
-                                                            __(
-                                                                'Untitled scrap',
-                                                            )}
-                                                    </p>
-                                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                        {child.summary ??
-                                                            __(
-                                                                'No summary yet.',
-                                                            )}
-                                                    </p>
-                                                </div>
+                                            {statusLabels[
+                                                selectedScrap.status
+                                            ] ?? selectedScrap.status}
+                                        </Badge>
+                                        <Badge variant="outline">
+                                            {sourceLabels[
+                                                selectedScrap.sourceType
+                                            ] ?? selectedScrap.sourceType}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                            <DateDisplay
+                                                value={selectedScrap.occurredAt}
+                                            />
+                                        </span>
+                                    </div>
+
+                                    {selectedScrap.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedScrap.tags.map((tag) => (
                                                 <Badge
-                                                    variant={toneForStatus(
-                                                        child.status,
-                                                    )}
+                                                    key={tag}
+                                                    variant="outline"
                                                 >
-                                                    {statusLabels[
-                                                        child.status
-                                                    ] ?? child.status}
+                                                    #{tag}
                                                 </Badge>
-                                            </div>
-                                            <div className="mt-3 flex gap-2 text-xs text-muted-foreground">
-                                                <span>
-                                                    {sourceLabels[
-                                                        child.sourceType
-                                                    ] ?? child.sourceType}
-                                                </span>
-                                                <span>•</span>
-                                                <span>
-                                                    <DateDisplay
-                                                        value={child.occurredAt}
-                                                    />
-                                                </span>
-                                            </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
+
+                                    <h1 className="text-2xl font-bold text-foreground">
+                                        {selectedScrap.title ??
+                                            __('Untitled scrap')}
+                                    </h1>
                                 </div>
+
+                                <div className="rounded-2xl border border-border/70 bg-background/70 p-6">
+                                    <MarkdownPreview
+                                        content={selectedScrap.content}
+                                        headingPrefix={scrapHeadingPrefix}
+                                    />
+                                </div>
+
+                                {selectedScrap.children.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h2 className="text-sm font-medium text-foreground">
+                                            {__('Child scraps')}
+                                            <span className="ml-2 text-muted-foreground">
+                                                {__(':count linked', {
+                                                    count: selectedScrap
+                                                        .children.length,
+                                                })}
+                                            </span>
+                                        </h2>
+                                        <div className="space-y-3">
+                                            {selectedScrap.children.map(
+                                                (child) => (
+                                                    <div
+                                                        key={child.id}
+                                                        className="rounded-2xl border border-border/70 bg-background/60 p-4"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div>
+                                                                <p className="font-medium text-foreground">
+                                                                    {child.title ??
+                                                                        __(
+                                                                            'Untitled scrap',
+                                                                        )}
+                                                                </p>
+                                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                                    {child.summary ??
+                                                                        __(
+                                                                            'No summary yet.',
+                                                                        )}
+                                                                </p>
+                                                            </div>
+                                                            <Badge
+                                                                variant={toneForStatus(
+                                                                    child.status,
+                                                                )}
+                                                            >
+                                                                {statusLabels[
+                                                                    child.status
+                                                                ] ??
+                                                                    child.status}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="mt-3 flex gap-2 text-xs text-muted-foreground">
+                                                            <span>
+                                                                {sourceLabels[
+                                                                    child
+                                                                        .sourceType
+                                                                ] ??
+                                                                    child.sourceType}
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span>
+                                                                <DateDisplay
+                                                                    value={
+                                                                        child.occurredAt
+                                                                    }
+                                                                />
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
+
+                            {scrapHeadings.length > 0 && (
+                                <aside className="hidden self-start lg:sticky lg:top-24 lg:block">
+                                    <TableOfContents
+                                        headings={scrapHeadings}
+                                        sticky
+                                    />
+                                </aside>
+                            )}
+                        </div>
                     </div>
                 </div>
             </>
@@ -649,19 +723,10 @@ export default function Articles({
                 {/* List */}
                 <InfiniteScroll
                     data="scraps"
-                    manual
-                    next={({ loading, fetch, hasMore }) =>
-                        hasMore ? (
-                            <div className="pt-4 text-center">
-                                <Button
-                                    variant="outline"
-                                    disabled={loading}
-                                    onClick={fetch}
-                                >
-                                    {loading
-                                        ? __('Loading...')
-                                        : __('Load more')}
-                                </Button>
+                    next={({ loading }) =>
+                        loading ? (
+                            <div className="pt-4 text-center text-sm text-muted-foreground">
+                                {__('Loading...')}
                             </div>
                         ) : null
                     }
@@ -766,28 +831,49 @@ export default function Articles({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setCheckedIds(new Set())}
-                                disabled={isArchiving || isGenerating}
+                                disabled={
+                                    isArchiving || isDeleting || isGenerating
+                                }
                             >
                                 {__('Clear')}
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={bulkArchive}
-                                disabled={isArchiving || isGenerating}
-                            >
-                                <ArchiveIcon className="size-3.5" />
-                                {isArchiving
-                                    ? __('Archiving…')
-                                    : __('Archive :count', {
-                                          count: checkedIds.size,
-                                      })}
-                            </Button>
+                            {isArchivedView ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={bulkDestroy}
+                                    disabled={isDeleting || isGenerating}
+                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                    <Trash2Icon className="size-3.5" />
+                                    {isDeleting
+                                        ? __('Deleting…')
+                                        : __('Delete :count', {
+                                              count: checkedIds.size,
+                                          })}
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={bulkArchive}
+                                    disabled={isArchiving || isGenerating}
+                                >
+                                    <ArchiveIcon className="size-3.5" />
+                                    {isArchiving
+                                        ? __('Archiving…')
+                                        : __('Archive :count', {
+                                              count: checkedIds.size,
+                                          })}
+                                </Button>
+                            )}
                             <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={generateDocument}
-                                disabled={isArchiving || isGenerating}
+                                disabled={
+                                    isArchiving || isDeleting || isGenerating
+                                }
                             >
                                 <FileTextIcon className="size-3.5" />
                                 {isGenerating
@@ -799,7 +885,9 @@ export default function Articles({
                             <Button
                                 size="sm"
                                 onClick={startBulkBackup}
-                                disabled={isArchiving || isGenerating}
+                                disabled={
+                                    isArchiving || isDeleting || isGenerating
+                                }
                             >
                                 <HardDriveDownloadIcon className="size-3.5" />
                                 {__('Backup :count', {

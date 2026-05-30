@@ -1,5 +1,5 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
-import { Form, Head, router, setLayoutProps } from '@inertiajs/react';
+import { Form, Head, router, setLayoutProps, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import ApiTokenController from '@/actions/App/Http/Controllers/Settings/ApiTokenController';
 import Heading from '@/components/heading';
@@ -28,11 +28,18 @@ type Props = {
     tokens: Token[];
 };
 
+type PageProps = {
+    flash?: {
+        newToken?: string;
+    };
+};
+
 export default function ApiTokens({ tokens }: Props) {
     const { __ } = useLang();
-    const [newToken, setNewToken] = useState<string | null>(null);
+    const { flash } = usePage<PageProps>().props;
     const [expiryDays, setExpiryDays] = useState<string | undefined>(undefined);
     const [copiedText, copy] = useClipboard();
+    const newToken = typeof flash?.newToken === 'string' ? flash.newToken : null;
 
     setLayoutProps({
         breadcrumbs: [{ title: __('API Tokens'), href: edit() }],
@@ -55,16 +62,7 @@ export default function ApiTokens({ tokens }: Props) {
 
                 <Form
                     {...ApiTokenController.store.form()}
-                    options={{
-                        preserveScroll: true,
-                        onFlash: (flash: Record<string, unknown>) => {
-                            const token = flash.newToken;
-
-                            if (typeof token === 'string') {
-                                setNewToken(token);
-                            }
-                        },
-                    }}
+                    options={{ preserveScroll: true }}
                     className="space-y-4"
                 >
                     {({ processing }) => (

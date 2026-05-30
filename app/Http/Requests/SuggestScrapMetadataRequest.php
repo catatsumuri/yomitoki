@@ -40,7 +40,7 @@ class SuggestScrapMetadataRequest extends FormRequest
             ],
             'title' => ['nullable', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:10000'],
+            'content' => ['required', 'string'],
         ];
     }
 }

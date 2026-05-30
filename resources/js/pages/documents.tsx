@@ -75,7 +75,9 @@ export default function Documents({
     );
 
     function visitTag(tag: string | null): void {
-        router.visit(tag ? documents({ tag }) : documents());
+        router.visit(
+            tag ? documents({ query: { tag } }) : documents(),
+        );
     }
 
     // ── Detail view ────────────────────────────────────────────────────────
