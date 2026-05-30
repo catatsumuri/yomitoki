@@ -46,8 +46,10 @@ services:
                 - '${DB_DATABASE:-yomitoki}'
                 - '-U'
                 - '${DB_USERNAME:-sail}'
-            retries: 3
+            interval: 2s
             timeout: 5s
+            retries: 10
+            start_period: 5s
 networks:
     sail:
         driver: bridge

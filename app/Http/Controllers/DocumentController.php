@@ -7,11 +7,15 @@ use App\Jobs\ComposeDocumentJob;
 use App\Models\AiRun;
 use App\Models\Document;
 use App\Models\DocumentRevision;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class DocumentController extends Controller
 {
@@ -154,6 +158,46 @@ class DocumentController extends Controller
         ]);
 
         return redirect()->route('documents.show', $document);
+    }
+
+    /**
+     * Stream the document as a PDF download.
+     */
+    public function pdf(Request $request, Document $document): SymfonyResponse
+    {
+        abort_if($document->user_id !== $request->user()->id, 403);
+
+        $meta = is_array($document->meta) ? $document->meta : [];
+        $tags = collect($meta['tags'] ?? [])
+            ->filter(fn (mixed $tag) => is_string($tag) && $tag !== '')
+            ->values()
+            ->all();
+
+        $contentHtml = $document->content_markdown
+            ? Str::markdown($document->content_markdown)
+            : '';
+
+        $fontCache = storage_path('fonts');
+
+        if (! is_dir($fontCache) && ! mkdir($fontCache, 0755, true) && ! is_dir($fontCache)) {
+            throw new RuntimeException('Unable to create PDF font cache directory.');
+        }
+
+        $pdf = Pdf::setOptions([
+            'fontDir' => $fontCache,
+            'fontCache' => $fontCache,
+            'chroot' => base_path(),
+            'defaultFont' => 'IPAGothic',
+        ])->loadView('documents.pdf', [
+            'title' => $document->title,
+            'documentType' => $document->document_type,
+            'tags' => $tags,
+            'summary' => $document->summary,
+            'contentHtml' => $contentHtml,
+            'createdAt' => $document->created_at,
+        ]);
+
+        return $pdf->download(Str::slug($document->title).'.pdf');
     }
 
     /**

@@ -197,6 +197,14 @@ Run tests:
 vendor/bin/sail artisan test --compact
 ```
 
+### PDF Export Font Handling
+
+Document PDF export (Dompdf) uses a Japanese font file and runtime-generated font cache files.
+
+- Commit only source font files that are actually required (currently `resources/fonts/ipag.ttf`).
+- Do not commit generated files under `storage/fonts` (metrics/cache). They are generated at runtime.
+- If you need a different font in your environment, place the TTF file under `resources/fonts` and update the PDF view/controller font settings accordingly.
+
 ## Saving a Plan Manually
 
 Save a Markdown plan file as a Scrap:

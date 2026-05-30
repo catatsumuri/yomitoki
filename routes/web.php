@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
     Route::get('documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
     Route::get('documents/{document}/revisions', [DocumentController::class, 'revisions'])->name('documents.revisions');
+    Route::get('documents/{document}/pdf', [DocumentController::class, 'pdf'])->name('documents.pdf');
     Route::patch('documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
     Route::post('documents/compose', [DocumentController::class, 'compose'])->name('documents.compose');

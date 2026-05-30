@@ -6,11 +6,12 @@ import {
     router,
     setLayoutProps,
 } from '@inertiajs/react';
-import { PencilIcon, Trash2Icon } from 'lucide-react';
+import { FileDownIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import {
     destroy as documentsDestroy,
     edit as documentsEdit,
+    pdf as documentsPdf,
     show as documentsShow,
 } from '@/actions/App/Http/Controllers/DocumentController';
 import { DateDisplay } from '@/components/date-display';
@@ -94,6 +95,21 @@ export default function Documents({
                             ← {__('Documents')}
                         </Link>
                         <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground"
+                                asChild
+                            >
+                                <a
+                                    href={
+                                        documentsPdf(selectedDocument.id).url
+                                    }
+                                    download
+                                >
+                                    <FileDownIcon className="size-4" />
+                                </a>
+                            </Button>
                             <Button
                                 variant="ghost"
                                 size="sm"

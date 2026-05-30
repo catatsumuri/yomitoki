@@ -138,6 +138,42 @@ test('users cannot update documents belonging to other users', function () {
         ->assertForbidden();
 });
 
+test('guests are redirected to login for document pdf', function () {
+    $document = Document::factory()->create();
+
+    $this->get(route('documents.pdf', $document))
+        ->assertRedirect(route('login'));
+});
+
+test('authenticated users can download their document as pdf', function () {
+    $user = User::factory()->create();
+    $document = Document::factory()->for($user)->create([
+        'title' => 'My Test Document',
+        'document_type' => 'spec',
+        'content_markdown' => '# Hello World',
+        'summary' => 'A test summary.',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('documents.pdf', $document))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+
+    expect((string) $response->headers->get('content-disposition'))
+        ->toContain('attachment;')
+        ->toContain('my-test-document.pdf');
+});
+
+test('users cannot download pdf of documents belonging to other users', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $document = Document::factory()->for($other)->create();
+
+    $this->actingAs($user)
+        ->get(route('documents.pdf', $document))
+        ->assertForbidden();
+});
+
 test('documents index can be filtered by tag', function () {
     $user = User::factory()->create();
     Document::factory()->for($user)->create(['meta' => ['tags' => ['design']]]);
