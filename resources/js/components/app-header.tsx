@@ -42,7 +42,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
     const { auth } = page.props;
     const getInitials = useInitials();
-    const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
+    const { isCurrentOrParentUrl } = useCurrentUrl();
     const { __ } = useLang();
 
     const mainNavItems: NavItem[] = [
@@ -96,7 +96,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             href={item.href}
                                             className={cn(
                                                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                                                isCurrentUrl(item.href)
+                                                isCurrentOrParentUrl(item.href)
                                                     ? 'bg-primary/10 text-primary'
                                                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                                             )}
@@ -133,10 +133,9 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             href={item.href}
                                             className={cn(
                                                 navigationMenuTriggerStyle(),
-                                                whenCurrentUrl(
-                                                    item.href,
-                                                    activeItemStyles,
-                                                ),
+                                                isCurrentOrParentUrl(item.href)
+                                                    ? activeItemStyles
+                                                    : null,
                                                 'h-9 cursor-pointer px-3',
                                             )}
                                         >
@@ -145,7 +144,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             )}
                                             {item.title}
                                         </Link>
-                                        {isCurrentUrl(item.href) && (
+                                        {isCurrentOrParentUrl(item.href) && (
                                             <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary" />
                                         )}
                                     </NavigationMenuItem>

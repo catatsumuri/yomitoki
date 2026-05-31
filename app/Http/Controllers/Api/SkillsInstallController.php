@@ -71,7 +71,7 @@ class SkillsInstallController extends Controller
         $lines[] = '';
         $lines[] = '# Save config';
         $lines[] = 'mkdir -p "$HOME/.config/yomitoki"';
-        $lines[] = 'printf "YOMITOKI_URL=%s\\nYOMITOKI_TOKEN=%s\\n" "$YOMITOKI_URL" "$YOMITOKI_TOKEN" > "$HOME/.config/yomitoki/config"';
+        $lines[] = 'printf "YOMITOKI_URL=\'%s\'\\nYOMITOKI_TOKEN=\'%s\'\\n" "$YOMITOKI_URL" "$YOMITOKI_TOKEN" > "$HOME/.config/yomitoki/config"';
         $lines[] = 'chmod 600 "$HOME/.config/yomitoki/config"';
         $lines[] = '';
 

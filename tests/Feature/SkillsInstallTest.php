@@ -33,6 +33,17 @@ test('install returns shell script for claude_code', function () {
         ->toContain('YOMITOKI_URL=');
 });
 
+test('install script saves quoted config values', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    $body = $this->withToken($token)->get('/api/skills/install')->getContent();
+
+    expect($body)
+        ->toContain("YOMITOKI_URL='%s'")
+        ->toContain("YOMITOKI_TOKEN='%s'");
+});
+
 test('install returns shell script for codex', function () {
     $user = User::factory()->create();
     $token = $user->createToken('test', ['ingest'])->plainTextToken;
