@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import { show as scrapRevisionsShow } from '@/actions/App/Http/Controllers/ScrapRevisionsController';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import InputError from '@/components/input-error';
 import { MarkdownPreview } from '@/components/markdown-preview';
 import { ScrapCard } from '@/components/scrap-card';
@@ -269,6 +270,8 @@ export default function Dashboard({
             },
         ],
     });
+
+    useReloadOnFocus(['inboxItems']);
 
     const form = useForm({
         title: '',

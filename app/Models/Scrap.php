@@ -79,10 +79,12 @@ class Scrap extends Model
             return collect();
         }
 
+        $vector = json_decode($this->embedding, true);
+
         return static::query()
             ->select(['id', 'title', 'slug', 'summary', 'status', 'source_type', 'occurred_at'])
-            ->selectVectorDistance('embedding', $this->embedding, 'distance')
-            ->whereVectorSimilarTo('embedding', $this->embedding, minSimilarity: 0.0, order: true)
+            ->selectVectorDistance('embedding', $vector, 'distance')
+            ->whereVectorSimilarTo('embedding', $vector, minSimilarity: 0.0, order: true)
             ->where('user_id', $this->user_id)
             ->where('id', '!=', $this->id)
             ->whereNull('parent_id')

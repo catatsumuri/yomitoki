@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { extractMarkdownHeadings } from '@/lib/markdown-headings';
 import { toneForStatus } from '@/lib/scrap-utils';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import { scraps as scrapsRoute } from '@/routes';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
 import { compose as documentsCompose } from '@/routes/documents';
@@ -132,6 +133,8 @@ export default function Articles({
     setLayoutProps({
         breadcrumbs: [{ title: __('Scraps'), href: scrapsRoute() }],
     });
+
+    useReloadOnFocus(['scraps', 'availableTags']);
 
     // Reset checked state and close any open SSE when filters change
     useEffect(() => {

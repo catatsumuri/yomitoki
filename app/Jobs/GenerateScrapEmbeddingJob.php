@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Scrap;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
 use Laravel\Ai\Embeddings;
 
 class GenerateScrapEmbeddingJob implements ShouldQueue
@@ -30,10 +31,11 @@ class GenerateScrapEmbeddingJob implements ShouldQueue
             ? $scrap->summary
             : $this->stripCodeBlocks($scrap->content ?? '');
 
-        $text = implode("\n\n", array_filter([
-            $scrap->title,
-            $body,
-        ]));
+        $text = Str::limit(
+            implode("\n\n", array_filter([$scrap->title, $body])),
+            20000,
+            '',
+        );
 
         $response = Embeddings::for([$text])->generate();
 
