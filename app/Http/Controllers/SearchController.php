@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Ai\Agents\SearchScrapAgent;
 use App\Http\Requests\SearchQueryRequest;
-use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -60,59 +58,10 @@ class SearchController extends Controller
     public function query(SearchQueryRequest $request): StreamableAgentResponse
     {
         $validated = $request->validated();
-        $query = $validated['query'];
-        $conversationId = $validated['conversation_id'];
-
-        $relatedScrapsQuery = Scrap::query()
-            ->where('user_id', $request->user()->id)
-            ->whereNull('parent_id')
-            ->where('status', '!=', 'archived')
-            ->whereNotNull('embedding');
-
-        if (DB::connection()->getDriverName() === 'pgsql') {
-            $relatedScrapsQuery->whereVectorSimilarTo('embedding', $query, 0.2);
-        }
-
-        $relatedScraps = $relatedScrapsQuery
-            ->latest()
-            ->limit(5)
-            ->get(['title', 'slug', 'summary', 'content_markdown']);
-
-        $prompt = $this->buildContextualPrompt($query, $relatedScraps);
 
         return SearchScrapAgent::make()
-            ->continue($conversationId, as: $request->user())
-            ->stream($prompt)
+            ->continue($validated['conversation_id'], as: $request->user())
+            ->stream($validated['query'])
             ->usingVercelDataProtocol();
-    }
-
-    /**
-     * Build a contextual prompt by injecting retrieved scraps.
-     *
-     * @param  Collection<int, Scrap>  $scraps
-     */
-    private function buildContextualPrompt(string $query, Collection $scraps): string
-    {
-        if ($scraps->isEmpty()) {
-            return $query;
-        }
-
-        $context = $scraps
-            ->map(function (Scrap $scrap) {
-                $header = $scrap->slug
-                    ? '### ['.$scrap->title.']('.route('dashboard.show', $scrap->slug).')'
-                    : '### '.$scrap->title;
-
-                return $header."\n".($scrap->summary ?? $scrap->content_markdown);
-            })
-            ->implode("\n\n");
-
-        return <<<TEXT
-関連スクラップ:
-{$context}
-
----
-質問: {$query}
-TEXT;
     }
 }

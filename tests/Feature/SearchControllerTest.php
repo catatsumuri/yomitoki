@@ -1,12 +1,10 @@
 <?php
 
 use App\Ai\Agents\SearchScrapAgent;
-use App\Models\Scrap;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Laravel\Ai\Embeddings;
 
 uses(RefreshDatabase::class);
 
@@ -81,14 +79,8 @@ test('init requires authentication', function () {
     $this->postJson(route('search.init'))->assertUnauthorized();
 });
 
-test('query injects related scraps into prompt when embeddings exist', function () {
+test('query passes the raw query directly to the agent', function () {
     SearchScrapAgent::fake(['shiki を使ってシンタックスハイライトを実装しました。']);
-
-    // Use the same vector for both the query embedding and the stored scrap embedding
-    // so pgvector returns max similarity (cosine distance = 0)
-    $sharedEmbedding = array_fill(0, 1536, 0.1);
-
-    Embeddings::fake([[$sharedEmbedding]]);
 
     $user = User::factory()->create();
     $conversationId = (string) Str::uuid();
@@ -101,20 +93,12 @@ test('query injects related scraps into prompt when embeddings exist', function 
         'updated_at' => now(),
     ]);
 
-    Scrap::factory()->create([
-        'user_id' => $user->id,
-        'title' => 'シンタックスハイライト実装',
-        'summary' => 'shiki を使ったコードハイライトの実装',
-        'embedding' => json_encode($sharedEmbedding),
-        'status' => 'raw',
-    ]);
-
     $this->actingAs($user)->post(route('search.query'), [
         'query' => 'シンタックスハイライトはどうしてた？',
         'conversation_id' => $conversationId,
     ])->assertOk();
 
     SearchScrapAgent::assertPrompted(
-        fn ($prompt) => str_contains($prompt->prompt, '関連スクラップ'),
+        fn ($prompt) => $prompt->prompt === 'シンタックスハイライトはどうしてた？',
     );
 });

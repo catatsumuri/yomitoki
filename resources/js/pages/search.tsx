@@ -8,9 +8,17 @@ import { Spinner } from '@/components/ui/spinner';
 import { search } from '@/routes';
 import { query as searchQuery } from '@/routes/search';
 
+type ScrapRef = {
+    title: string;
+    slug: string;
+    summary: string | null;
+    url: string;
+};
+
 type Message = {
     role: 'user' | 'assistant';
     content: string;
+    scraps?: ScrapRef[];
 };
 
 type Props = {
@@ -99,6 +107,7 @@ export default function Search({ conversationId }: Props) {
                             const event = JSON.parse(line.slice(6)) as {
                                 type: string;
                                 delta?: string;
+                                output?: string;
                             };
 
                             if (event.type === 'text-delta' && event.delta) {
@@ -115,6 +124,32 @@ export default function Search({ conversationId }: Props) {
 
                                     return next;
                                 });
+                            } else if (
+                                event.type === 'tool-output-available' &&
+                                event.output
+                            ) {
+                                const jsonMatch =
+                                    event.output.match(/\[[\s\S]*\]/);
+
+                                if (jsonMatch) {
+                                    const scraps = JSON.parse(
+                                        jsonMatch[0],
+                                    ) as ScrapRef[];
+
+                                    setMessages((prev) => {
+                                        const next = [...prev];
+                                        const last = next[next.length - 1];
+
+                                        if (last?.role === 'assistant') {
+                                            next[next.length - 1] = {
+                                                ...last,
+                                                scraps,
+                                            };
+                                        }
+
+                                        return next;
+                                    });
+                                }
                             }
                         } catch {
                             // skip malformed chunk
@@ -187,9 +222,36 @@ export default function Search({ conversationId }: Props) {
                                             index === messages.length - 1 ? (
                                                 <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
                                             ) : (
-                                                <MarkdownPreview
-                                                    content={message.content}
-                                                />
+                                                <>
+                                                    <MarkdownPreview
+                                                        content={
+                                                            message.content
+                                                        }
+                                                    />
+                                                    {message.scraps &&
+                                                        message.scraps.length >
+                                                            0 && (
+                                                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                                                {message.scraps.map(
+                                                                    (scrap) => (
+                                                                        <a
+                                                                            key={
+                                                                                scrap.slug
+                                                                            }
+                                                                            href={
+                                                                                scrap.url
+                                                                            }
+                                                                            className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium hover:bg-muted"
+                                                                        >
+                                                                            {
+                                                                                scrap.title
+                                                                            }
+                                                                        </a>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                </>
                                             )}
                                         </div>
                                     )}
