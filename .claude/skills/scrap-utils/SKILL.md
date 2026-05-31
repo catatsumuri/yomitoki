@@ -14,10 +14,16 @@ Scrap の汎用 CRUD を CLI から行うユーティリティ。
 
 以下の順で判断すること：
 
-1. **`YOMITOKI_URL` と `YOMITOKI_TOKEN` が設定済み** → Scripts セクションのスクリプトを使う
-2. **未設定** → ユーザーに URL とトークンを確認する
-   - 教えてもらえた場合 → スクリプトで操作（セッション中のみ使用、保存しない）
-   - 不明・拒否された場合 → Artisan にフォールバック
+1. **環境変数 `YOMITOKI_URL` / `YOMITOKI_TOKEN` が設定済み** → Scripts セクションのスクリプトを使う
+2. **未設定** → `~/.config/yomitoki/config` を確認する
+   ```bash
+   export YOMITOKI_URL=$(grep YOMITOKI_URL ~/.config/yomitoki/config | cut -d= -f2-)
+   export YOMITOKI_TOKEN=$(grep YOMITOKI_TOKEN ~/.config/yomitoki/config | cut -d= -f2-)
+   ```
+   - 読み込めた → スクリプトで操作（`source` は `|` を含むトークンで誤動作するため `grep + cut` を使うこと）
+   - ファイルがない → ユーザーに URL とトークンを確認する
+     - 教えてもらえた → スクリプトで操作（セッション中のみ使用、保存しない）
+     - 不明・拒否された → Artisan にフォールバック
 3. **Artisan にフォールバックする場合** → まず環境を確認する
    ```bash
    vendor/bin/sail artisan scraps:list --limit=1

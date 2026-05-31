@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Ai\Agents\SuggestScrapMetadataAgent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ImportScrapRequest;
 use App\Jobs\GenerateScrapEmbeddingJob;
@@ -25,9 +26,13 @@ class ImportScrapController extends Controller
 
         ['frontmatter' => $frontmatter, 'content' => $content] = $this->parseFrontmatter($rawContent);
 
-        $slugCandidate = $validated['slug'] ?? ($frontmatter['slug'] ?? null);
-        $title = blank($slugCandidate) ? ($frontmatter['title'] ?? null) : null;
-        $title = $title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $explicitSlug = $validated['slug'] ?? ($frontmatter['slug'] ?? null);
+        $title = $frontmatter['title'] ?? pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+
+        $slugCandidate = blank($explicitSlug)
+            ? $this->suggestSlug($title, $content)
+            : $explicitSlug;
+
         $resolvedSlug = $this->makeUniqueSlug($slugCandidate, $title);
 
         $rawTags = $frontmatter['tags'] ?? $frontmatter['topics'] ?? [];
@@ -72,6 +77,35 @@ class ImportScrapController extends Controller
             'slug' => $scrap->slug,
             'url' => route('dashboard.show', ['slug' => $scrap->slug]),
         ], 201);
+    }
+
+    /**
+     * Ask the AI for a slug candidate, falling back to Str::slug(title) on failure.
+     */
+    private function suggestSlug(string $title, string $content): string
+    {
+        $existingSlugs = Scrap::query()
+            ->whereNotNull('slug')
+            ->orderBy('slug')
+            ->pluck('slug')
+            ->all();
+
+        $prompt = implode("\n\n", [
+            'Suggest a unique lowercase ASCII kebab-case slug for the following content.',
+            'The slug must not appear in this list: '.implode(', ', $existingSlugs ?: ['(none)']),
+            "Title: {$title}",
+            'Content (excerpt): '.Str::limit($content, 500),
+        ]);
+
+        try {
+            $response = SuggestScrapMetadataAgent::make(shouldSuggestSlug: true)
+                ->prompt($prompt)
+                ->toArray();
+
+            return $response['slug'] ?? Str::slug($title);
+        } catch (\Throwable) {
+            return Str::slug($title);
+        }
     }
 
     /**
