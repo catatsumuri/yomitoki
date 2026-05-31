@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'user_id',
@@ -76,34 +75,31 @@ class Scrap extends Model
      */
     public function relatedScraps(int $limit = 5): Collection
     {
-        if (! $this->embedding || DB::getDriverName() !== 'pgsql') {
+        if (! $this->embedding) {
             return collect();
         }
 
-        return collect(DB::select(
-            <<<'SQL'
-            SELECT id, title, slug, summary, status, source_type, occurred_at,
-                   1 - (embedding <=> ?::vector) AS similarity
-            FROM scraps
-            WHERE user_id = ?
-              AND id != ?
-              AND parent_id IS NULL
-              AND status != 'archived'
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> ?::vector
-            LIMIT ?
-            SQL,
-            [$this->embedding, $this->user_id, $this->id, $this->embedding, $limit],
-        ))->map(fn (object $row) => [
-            'id' => $row->id,
-            'title' => $row->title,
-            'slug' => $row->slug,
-            'summary' => $row->summary,
-            'status' => $row->status,
-            'sourceType' => $row->source_type,
-            'occurredAt' => $row->occurred_at,
-            'similarity' => round((float) $row->similarity, 3),
-        ]);
+        return static::query()
+            ->select(['id', 'title', 'slug', 'summary', 'status', 'source_type', 'occurred_at'])
+            ->selectVectorDistance('embedding', $this->embedding, 'distance')
+            ->whereVectorSimilarTo('embedding', $this->embedding, minSimilarity: 0.0, order: true)
+            ->where('user_id', $this->user_id)
+            ->where('id', '!=', $this->id)
+            ->whereNull('parent_id')
+            ->where('status', '!=', 'archived')
+            ->whereNotNull('embedding')
+            ->limit($limit)
+            ->get()
+            ->map(fn (self $row) => [
+                'id' => $row->id,
+                'title' => $row->title,
+                'slug' => $row->slug,
+                'summary' => $row->summary,
+                'status' => $row->status,
+                'sourceType' => $row->source_type,
+                'occurredAt' => $row->occurred_at,
+                'similarity' => round(1 - (float) $row->distance, 3),
+            ]);
     }
 
     /**
