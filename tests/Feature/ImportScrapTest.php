@@ -49,6 +49,30 @@ test('frontmatter title and tags are extracted from markdown files', function ()
     Queue::assertNotPushed(SummarizeScrapJob::class);
 });
 
+test('frontmatter topics are used when tags are absent', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+    $content = "---\ntitle: Zenn Note\ntopics:\n  - backend\n  - laravel\n---\n\nBody content here.";
+    $file = UploadedFile::fake()->createWithContent('note.md', $content);
+
+    $this->withToken($token)
+        ->post(route('api.scraps.import'), ['file' => $file]);
+
+    expect(Scrap::first()?->meta['tags'])->toBe(['backend', 'laravel']);
+});
+
+test('frontmatter created date sets the scrap occurred at timestamp', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+    $content = "---\ncreated: 2024-06-01\n---\n\nBody content here.";
+    $file = UploadedFile::fake()->createWithContent('note.md', $content);
+
+    $this->withToken($token)
+        ->post(route('api.scraps.import'), ['file' => $file]);
+
+    expect(Scrap::first()?->occurred_at?->toDateString())->toBe('2024-06-01');
+});
+
 test('file without frontmatter uses filename as title', function () {
     $user = User::factory()->create();
     $token = $user->createToken('test', ['ingest'])->plainTextToken;

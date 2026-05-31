@@ -21,6 +21,6 @@ class RestoreSeeder extends Seeder
             'email_verified_at' => now(),
         ])->save();
 
-        $this->call(ScrapBackupSeeder::class);
+        //        $this->call(ScrapBackupSeeder::class);
     }
 }

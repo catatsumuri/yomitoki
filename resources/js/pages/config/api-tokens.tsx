@@ -1,9 +1,19 @@
 import { useLang } from '@erag/lang-sync-inertia/react';
-import { Form, Head, router, setLayoutProps, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, setLayoutProps } from '@inertiajs/react';
 import { useState } from 'react';
 import ApiTokenController from '@/actions/App/Http/Controllers/Settings/ApiTokenController';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,8 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { useClipboard } from '@/hooks/use-clipboard';
-import { edit } from '@/routes/api-tokens';
+import { edit, show } from '@/routes/api-tokens';
 
 type Token = {
     id: number;
@@ -28,22 +37,26 @@ type Props = {
     tokens: Token[];
 };
 
-type PageProps = {
-    flash?: {
-        newToken?: string;
-    };
-};
-
 export default function ApiTokens({ tokens }: Props) {
     const { __ } = useLang();
-    const { flash } = usePage<PageProps>().props;
     const [expiryDays, setExpiryDays] = useState<string | undefined>(undefined);
-    const [copiedText, copy] = useClipboard();
-    const newToken = typeof flash?.newToken === 'string' ? flash.newToken : null;
+    const [selected, setSelected] = useState<number[]>([]);
 
     setLayoutProps({
         breadcrumbs: [{ title: __('API Tokens'), href: edit() }],
     });
+
+    function toggleSelect(id: number): void {
+        setSelected((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    }
+
+    function toggleAll(): void {
+        setSelected((prev) =>
+            prev.length === tokens.length ? [] : tokens.map((t) => t.id),
+        );
+    }
 
     return (
         <>
@@ -117,81 +130,116 @@ export default function ApiTokens({ tokens }: Props) {
                         </>
                     )}
                 </Form>
-
-                {newToken && (
-                    <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950">
-                        <p className="mb-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            {__(
-                                'Copy your token now — it will not be shown again.',
-                            )}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <code className="flex-1 rounded bg-white px-2 py-1 font-mono text-xs break-all dark:bg-black">
-                                {newToken}
-                            </code>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => copy(newToken)}
-                            >
-                                {copiedText === newToken
-                                    ? __('Copied!')
-                                    : __('Copy')}
-                            </Button>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {tokens.length > 0 && (
-                <div className="space-y-6">
-                    <Heading
-                        variant="small"
-                        title={__('Active tokens')}
-                        description={__('Revoke tokens you no longer need.')}
-                    />
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <Heading variant="small" title={__('Active tokens')} />
+
+                        {selected.length > 0 && (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="destructive" size="sm">
+                                        {__('Revoke :count', {
+                                            count: selected.length,
+                                        })}
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogTitle>
+                                        {__('Revoke selected tokens?')}
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        {__(
+                                            ':count token(s) will be permanently revoked. This cannot be undone.',
+                                            { count: selected.length },
+                                        )}
+                                    </DialogDescription>
+                                    <DialogFooter>
+                                        <DialogClose asChild>
+                                            <Button variant="secondary">
+                                                {__('Cancel')}
+                                            </Button>
+                                        </DialogClose>
+                                        <Button
+                                            variant="destructive"
+                                            onClick={() => {
+                                                router.delete(
+                                                    ApiTokenController.bulkDestroy.url(),
+                                                    {
+                                                        data: {
+                                                            token_ids: selected,
+                                                        },
+                                                        onSuccess: () =>
+                                                            setSelected([]),
+                                                    },
+                                                );
+                                            }}
+                                        >
+                                            {__('Revoke')}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </div>
 
                     <ul className="divide-y">
+                        <li className="flex items-center gap-3 py-2">
+                            <Checkbox
+                                id="select-all"
+                                checked={selected.length === tokens.length}
+                                onCheckedChange={toggleAll}
+                            />
+                            <Label
+                                htmlFor="select-all"
+                                className="cursor-pointer text-xs font-normal text-muted-foreground"
+                            >
+                                {__('Select all')}
+                            </Label>
+                        </li>
                         {tokens.map((token) => (
                             <li
                                 key={token.id}
-                                className="flex items-center justify-between py-3"
+                                className="flex items-center gap-3 py-3"
                             >
-                                <div>
-                                    <p className="text-sm font-medium">
-                                        {token.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {token.last_used_at
-                                            ? __('Last used :date', {
-                                                  date: new Date(
-                                                      token.last_used_at,
-                                                  ).toLocaleDateString(),
-                                              })
-                                            : __('Never used')}
-                                        {token.expires_at &&
-                                            ' · ' +
-                                                __('Expires :date', {
-                                                    date: new Date(
-                                                        token.expires_at,
-                                                    ).toLocaleDateString(),
-                                                })}
-                                    </p>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() =>
-                                        router.delete(
-                                            ApiTokenController.destroy.url(
-                                                token.id,
-                                            ),
-                                            { preserveScroll: true },
-                                        )
+                                <Checkbox
+                                    checked={selected.includes(token.id)}
+                                    onCheckedChange={() =>
+                                        toggleSelect(token.id)
                                     }
+                                    aria-label={token.name}
+                                />
+                                <Link
+                                    href={show(token.id)}
+                                    className="flex flex-1 items-center justify-between hover:opacity-70"
                                 >
-                                    {__('Revoke')}
-                                </Button>
+                                    <div>
+                                        <p className="text-sm font-medium">
+                                            {token.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {token.last_used_at
+                                                ? __('Last used :date', {
+                                                      date: new Date(
+                                                          token.last_used_at,
+                                                      ).toLocaleDateString(),
+                                                  })
+                                                : __('Never used')}
+                                            {token.expires_at &&
+                                                ' · ' +
+                                                    __('Expires :date', {
+                                                        date: new Date(
+                                                            token.expires_at,
+                                                        ).toLocaleDateString(),
+                                                    })}
+                                        </p>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                        →
+                                    </span>
+                                </Link>
                             </li>
                         ))}
                     </ul>

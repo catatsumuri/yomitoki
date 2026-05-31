@@ -9,6 +9,7 @@ use App\Jobs\GenerateScrapSummaryJob;
 use App\Jobs\SummarizeScrapJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
@@ -29,7 +30,8 @@ class ImportScrapController extends Controller
         $title = $title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $resolvedSlug = $this->makeUniqueSlug($slugCandidate, $title);
 
-        $tags = collect($frontmatter['tags'] ?? [])
+        $rawTags = $frontmatter['tags'] ?? $frontmatter['topics'] ?? [];
+        $tags = collect(is_array($rawTags) ? $rawTags : [$rawTags])
             ->filter(fn (mixed $t) => is_string($t) && $t !== '')
             ->values()
             ->all();
@@ -39,6 +41,8 @@ class ImportScrapController extends Controller
             $tags[] = $project;
         }
 
+        $occurredAt = $this->resolveOccurredAt($frontmatter);
+
         $scrap = Scrap::create([
             'user_id' => $request->user()->id,
             'source_type' => 'note',
@@ -47,7 +51,7 @@ class ImportScrapController extends Controller
             'content' => $content,
             'content_markdown' => $content,
             'status' => 'raw',
-            'occurred_at' => now(),
+            'occurred_at' => $occurredAt,
             'meta' => array_filter([
                 'tags' => $tags,
                 'project' => $project,
@@ -68,6 +72,38 @@ class ImportScrapController extends Controller
             'slug' => $scrap->slug,
             'url' => route('dashboard.show', ['slug' => $scrap->slug]),
         ], 201);
+    }
+
+    /**
+     * Resolve occurred_at from frontmatter created/date fields, falling back to now().
+     *
+     * @param  array<string, mixed>  $frontmatter
+     */
+    private function resolveOccurredAt(array $frontmatter): Carbon
+    {
+        foreach (['created', 'date', 'created_at'] as $key) {
+            $value = $frontmatter[$key] ?? null;
+
+            if (blank($value)) {
+                continue;
+            }
+
+            if ($value instanceof \DateTimeInterface) {
+                return Carbon::instance($value);
+            }
+
+            if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                return Carbon::createFromTimestamp((int) $value);
+            }
+
+            try {
+                return Carbon::parse((string) $value);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return Carbon::now();
     }
 
     /**

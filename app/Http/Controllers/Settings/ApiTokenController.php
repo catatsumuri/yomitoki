@@ -35,6 +35,49 @@ class ApiTokenController extends Controller
     }
 
     /**
+     * Show the detail page for a single token.
+     */
+    public function show(Request $request, int $tokenId): Response
+    {
+        $token = $request->user()
+            ->tokens()
+            ->where('id', $tokenId)
+            ->firstOrFail();
+
+        return Inertia::render('config/api-tokens/show', [
+            'token' => [
+                'id' => $token->id,
+                'name' => $token->name,
+                'last_used_at' => $token->last_used_at?->toISOString(),
+                'expires_at' => $token->expires_at?->toISOString(),
+                'created_at' => $token->created_at->toISOString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Regenerate the given token (revoke + issue new one with same name/expiry).
+     */
+    public function regenerate(Request $request, int $tokenId): RedirectResponse
+    {
+        $old = $request->user()
+            ->tokens()
+            ->where('id', $tokenId)
+            ->firstOrFail();
+
+        $expiresAt = $old->expires_at;
+        $name = $old->name;
+
+        $old->delete();
+
+        $token = $request->user()->createToken($name, ['ingest'], $expiresAt);
+
+        Inertia::flash('newToken', $token->plainTextToken);
+
+        return to_route('api-tokens.show', $token->accessToken->id);
+    }
+
+    /**
      * Create a new API token.
      */
     public function store(Request $request): RedirectResponse
@@ -56,7 +99,7 @@ class ApiTokenController extends Controller
 
         Inertia::flash('newToken', $token->plainTextToken);
 
-        return to_route('api-tokens.edit');
+        return to_route('api-tokens.show', $token->accessToken->id);
     }
 
     /**
@@ -72,6 +115,26 @@ class ApiTokenController extends Controller
         abort_if($deleted === 0, 404);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Token revoked.')]);
+
+        return to_route('api-tokens.edit');
+    }
+
+    /**
+     * Revoke multiple tokens at once.
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'token_ids' => ['required', 'array'],
+            'token_ids.*' => ['integer'],
+        ]);
+
+        $request->user()
+            ->tokens()
+            ->whereIn('id', $validated['token_ids'])
+            ->delete();
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Tokens revoked.')]);
 
         return to_route('api-tokens.edit');
     }

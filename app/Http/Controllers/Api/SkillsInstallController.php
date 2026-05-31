@@ -21,12 +21,12 @@ class SkillsInstallController extends Controller
     {
         abort_unless($request->user()->currentAccessToken()?->can('ingest'), 403);
 
-        $agent = $request->query('agent', 'claude_code');
+        $agent = $request->query('agent', 'all');
         $profile = $request->query('profile', 'full');
 
-        if (! in_array($agent, ['claude_code', 'codex'], true)) {
+        if (! in_array($agent, ['claude_code', 'codex', 'all'], true)) {
             throw ValidationException::withMessages([
-                'agent' => ['Invalid agent. Supported values: claude_code, codex.'],
+                'agent' => ['Invalid agent. Supported values: claude_code, codex, all.'],
             ]);
         }
 
@@ -36,15 +36,16 @@ class SkillsInstallController extends Controller
             ]);
         }
 
-        $skillsDir = match ($agent) {
-            'codex' => '.agents/skills',
-            default => '.claude/skills',
+        $skillsDirs = match ($agent) {
+            'claude_code' => ['.claude/skills'],
+            'codex' => ['.agents/skills'],
+            default => ['.claude/skills', '.agents/skills'],
         };
 
         $url = $request->schemeAndHttpHost();
         $token = $request->bearerToken();
 
-        $script = $this->buildInstallScript($skillsDir, $url, $token, self::PROFILE_SKILLS[$profile]);
+        $script = $this->buildInstallScript($skillsDirs, $url, $token, self::PROFILE_SKILLS[$profile]);
 
         return response($script, 200, [
             'Content-Type' => 'text/x-shellscript',
@@ -52,18 +53,18 @@ class SkillsInstallController extends Controller
         ]);
     }
 
-    /** @param string[] $skills */
-    private function buildInstallScript(string $skillsDir, string $url, string $token, array $skills): string
+    /**
+     * @param  string[]  $skillsDirs
+     * @param  string[]  $skills
+     */
+    private function buildInstallScript(array $skillsDirs, string $url, string $token, array $skills): string
     {
-        $basePath = base_path($skillsDir);
-
         $lines = [];
         $lines[] = '#!/bin/bash';
         $lines[] = 'set -euo pipefail';
         $lines[] = '';
         $lines[] = 'YOMITOKI_URL="'.$url.'"';
         $lines[] = 'YOMITOKI_TOKEN="'.$token.'"';
-        $lines[] = 'SKILLS_DIR="'.$skillsDir.'"';
         $lines[] = '';
         $lines[] = 'command -v curl >/dev/null 2>&1 || { echo "Error: curl is required" >&2; exit 1; }';
         $lines[] = 'command -v jq >/dev/null 2>&1 || { echo "Error: jq is required. Install with: brew install jq" >&2; exit 1; }';
@@ -74,33 +75,38 @@ class SkillsInstallController extends Controller
         $lines[] = 'chmod 600 "$HOME/.config/yomitoki/config"';
         $lines[] = '';
 
-        foreach ($skills as $skillName) {
-            $skillPath = $basePath.'/'.$skillName;
+        foreach ($skillsDirs as $skillsDir) {
+            $basePath = base_path($skillsDir);
 
-            if (! File::isDirectory($skillPath)) {
-                continue;
-            }
+            foreach ($skills as $skillName) {
+                $skillPath = $basePath.'/'.$skillName;
 
-            $lines[] = "# Skill: $skillName";
-            $lines[] = 'mkdir -p "./$SKILLS_DIR/'.$skillName.'/scripts"';
-
-            $skillMd = $skillPath.'/SKILL.md';
-            if (File::exists($skillMd)) {
-                $lines[] = $this->fileBlock("./$skillsDir/$skillName/SKILL.md", File::get($skillMd));
-            }
-
-            $scriptsDir = $skillPath.'/scripts';
-            if (File::isDirectory($scriptsDir)) {
-                foreach (File::files($scriptsDir) as $script) {
-                    $lines[] = $this->fileBlock("./$skillsDir/$skillName/scripts/".$script->getFilename(), File::get($script->getPathname()));
-                    $lines[] = 'chmod +x "./$SKILLS_DIR/'.$skillName.'/scripts/'.$script->getFilename().'"';
+                if (! File::isDirectory($skillPath)) {
+                    continue;
                 }
+
+                $lines[] = "# Skill: $skillName → $skillsDir";
+                $lines[] = 'mkdir -p "./'.$skillsDir.'/'.$skillName.'/scripts"';
+
+                $skillMd = $skillPath.'/SKILL.md';
+                if (File::exists($skillMd)) {
+                    $lines[] = $this->fileBlock("./$skillsDir/$skillName/SKILL.md", File::get($skillMd));
+                }
+
+                $scriptsDir = $skillPath.'/scripts';
+                if (File::isDirectory($scriptsDir)) {
+                    foreach (File::files($scriptsDir) as $script) {
+                        $lines[] = $this->fileBlock("./$skillsDir/$skillName/scripts/".$script->getFilename(), File::get($script->getPathname()));
+                        $lines[] = 'chmod +x "./'.$skillsDir.'/'.$skillName.'/scripts/'.$script->getFilename().'"';
+                    }
+                }
+
+                $lines[] = '';
             }
 
-            $lines[] = '';
+            $lines[] = 'echo "✓ Yomitoki skills installed to ./'.$skillsDir.'"';
         }
 
-        $lines[] = 'echo "✓ Yomitoki skills installed to ./$SKILLS_DIR"';
         $lines[] = 'echo "  Config saved to ~/.config/yomitoki/config"';
         $lines[] = '';
 

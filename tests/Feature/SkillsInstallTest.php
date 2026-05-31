@@ -44,14 +44,28 @@ test('install returns shell script for codex', function () {
     expect($body)->toContain('.agents/skills');
 });
 
-test('install defaults to claude_code agent', function () {
+test('install defaults to all agents', function () {
     $user = User::factory()->create();
     $token = $user->createToken('test', ['ingest'])->plainTextToken;
 
     $response = $this->withToken($token)->get('/api/skills/install');
 
     $response->assertOk();
-    expect($response->getContent())->toContain('.claude/skills');
+    expect($response->getContent())
+        ->toContain('.claude/skills')
+        ->toContain('.agents/skills');
+});
+
+test('install with agent=all includes both skill directories', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['ingest'])->plainTextToken;
+
+    $response = $this->withToken($token)->get('/api/skills/install?agent=all');
+
+    $response->assertOk();
+    expect($response->getContent())
+        ->toContain('.claude/skills')
+        ->toContain('.agents/skills');
 });
 
 test('install with invalid agent returns 422', function () {

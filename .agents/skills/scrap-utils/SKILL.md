@@ -58,6 +58,42 @@ bash <skill-dir>/scripts/scrap-delete.sh "{slug}" [project-dir]
 - 子 Scrap も再帰的に削除される
 - 確認プロンプトなし（`--force` 固定）
 
+### ファイルをインポートする（.md / .txt）
+
+```bash
+curl -s -X POST "$YOMITOKI_URL/api/scraps/import" \
+  -H "Authorization: Bearer $YOMITOKI_TOKEN" \
+  -F "file=@{file}" \
+  -F "project={project}" | jq
+```
+
+- `{file}`: インポートする Markdown または テキストファイルのパス
+- `[project]`: タグとして付与するプロジェクト名（省略可）
+- ファイル先頭に YAML frontmatter があれば自動で解釈される
+
+**対応 frontmatter キー：**
+
+| キー | 説明 |
+|---|---|
+| `title` | スクラップのタイトル。なければファイル名を使用 |
+| `slug` | URL スラッグ。省略時はタイトルから生成 |
+| `tags` | タグの配列 |
+| `created` / `date` / `created_at` | 作成日時。`occurred_at` にマップされる |
+
+**frontmatter 例：**
+```markdown
+---
+title: 設計メモ
+slug: design-memo
+tags:
+  - backend
+  - laravel
+created: 2024-06-01
+---
+
+本文...
+```
+
 ## Artisan コマンド（直接実行）
 
 スクリプトを使わず Artisan コマンドを直接実行することもできる：
