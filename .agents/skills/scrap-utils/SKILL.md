@@ -10,9 +10,24 @@ description: Use this skill for basic Scrap CRUD operations from the CLI or scri
 Scrap の汎用 CRUD を CLI から行うユーティリティ。  
 `plan-to-markdown` などのスキルがスラッグ重複を事前確認するためにも利用できる。
 
+## 操作手段の選択
+
+以下の順で判断すること：
+
+1. **`YOMITOKI_URL` と `YOMITOKI_TOKEN` が設定済み** → Scripts セクションのスクリプトを使う
+2. **未設定** → ユーザーに URL とトークンを確認する
+   - 教えてもらえた場合 → スクリプトで操作（セッション中のみ使用、保存しない）
+   - 不明・拒否された場合 → Artisan にフォールバック
+3. **Artisan にフォールバックする場合** → まず環境を確認する
+   ```bash
+   vendor/bin/sail artisan scraps:list --limit=1
+   ```
+   - 通る → Artisan コマンドで操作
+   - 失敗する → Yomitoki プロジェクトのルートディレクトリで実行しているか確認をユーザーに促す
+
 ## Scripts
 
-すべてのスクリプトは `<skill-dir>` を実際のパス（例: `/opt/home-admin/yomitoki/.agents/skills/scrap-utils`）に置き換えて実行すること。
+すべてのスクリプトは `<skill-dir>` を実際のパス（例: `/path/to/project/.agents/skills/scrap-utils`）に置き換えて実行すること。
 
 ### Slug 一覧を取得する
 
