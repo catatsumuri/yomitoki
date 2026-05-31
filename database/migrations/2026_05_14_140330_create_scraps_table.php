@@ -33,7 +33,7 @@ return new class extends Migration
             $table->json('extracted_data')->nullable();
             $table->json('meta')->nullable();
             if ($supportsPgVector) {
-                $table->vector('embedding', 1024)->nullable();
+                $table->vector('embedding', 1536)->nullable();
             } else {
                 $table->longText('embedding')->nullable();
             }

@@ -86,7 +86,7 @@ test('query injects related scraps into prompt when embeddings exist', function 
 
     // Use the same vector for both the query embedding and the stored scrap embedding
     // so pgvector returns max similarity (cosine distance = 0)
-    $sharedEmbedding = array_fill(0, 1024, 0.1);
+    $sharedEmbedding = array_fill(0, 1536, 0.1);
 
     Embeddings::fake([[$sharedEmbedding]]);
 

@@ -35,7 +35,7 @@ test('search returns matching scraps with similarity', function () {
         $this->markTestSkipped('Requires PostgreSQL with pgvector.');
     }
 
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector]]);
 
     $user = User::factory()->create();
@@ -61,7 +61,7 @@ test('search returns matching scraps with similarity', function () {
 });
 
 test('search does not return other users scraps', function () {
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector]]);
 
     $user = User::factory()->create();
@@ -76,7 +76,7 @@ test('search does not return other users scraps', function () {
 });
 
 test('search does not return archived scraps', function () {
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector]]);
 
     $user = User::factory()->create();
@@ -98,7 +98,7 @@ test('search filters by source_type', function () {
         $this->markTestSkipped('Requires PostgreSQL with pgvector.');
     }
 
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector], [$vector]]);
 
     $user = User::factory()->create();
@@ -119,7 +119,7 @@ test('search with include=content returns content_markdown', function () {
         $this->markTestSkipped('Requires PostgreSQL with pgvector.');
     }
 
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector]]);
 
     $user = User::factory()->create();
@@ -140,7 +140,7 @@ test('search with include=content returns content_markdown', function () {
 });
 
 test('search without include does not return content_markdown', function () {
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
     Embeddings::fake([[$vector]]);
 
     $user = User::factory()->create();
@@ -155,7 +155,7 @@ test('search without include does not return content_markdown', function () {
 });
 
 test('search returns empty data when no embeddings exist', function () {
-    Embeddings::fake([[array_fill(0, 1024, 0.1)]]);
+    Embeddings::fake([[array_fill(0, 1536, 0.1)]]);
 
     $user = User::factory()->create();
     $token = $user->createToken('test', ['ingest'])->plainTextToken;
@@ -186,7 +186,7 @@ test('related returns related scraps', function () {
         $this->markTestSkipped('Requires PostgreSQL with pgvector.');
     }
 
-    $vector = array_fill(0, 1024, 0.1);
+    $vector = array_fill(0, 1536, 0.1);
 
     $user = User::factory()->create();
     $token = $user->createToken('test', ['ingest'])->plainTextToken;

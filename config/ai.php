@@ -13,11 +13,11 @@ return [
     |
     */
 
-    'default' => 'bedrock',
-    'default_for_images' => 'bedrock',
+    'default' => 'azure',
+    'default_for_images' => 'azure',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
-    'default_for_embeddings' => 'bedrock',
+    'default_for_embeddings' => 'azure',
     'default_for_reranking' => 'cohere',
 
     /*

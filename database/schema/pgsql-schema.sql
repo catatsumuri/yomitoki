@@ -472,7 +472,7 @@ CREATE TABLE public.scraps (
     processed_at timestamp(0) with time zone,
     extracted_data json,
     meta json,
-    embedding public.vector(1024),
+    embedding public.vector(1536),
     embedding_model character varying(255),
     embedding_generated_at timestamp(0) with time zone,
     created_at timestamp(0) with time zone,
@@ -1148,4 +1148,3 @@ SELECT pg_catalog.setval('public.migrations_id_seq', 12, true);
 --
 
 \unrestrict AbbkhBg3MYnidPNQE3HY9QWtuM27ykxbNrwZyN0dEqMOnwC5PmZ2sLGdWTGmU3y
-

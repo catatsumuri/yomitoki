@@ -3,6 +3,7 @@
 use App\Ai\Agents\PingAgent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -15,7 +16,11 @@ test('authenticated user can view ai settings page', function () {
 
     $this->actingAs($user)
         ->get('/config/ai')
-        ->assertOk();
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('config/ai')
+            ->where('provider', 'azure')
+        );
 });
 
 test('ping endpoint returns text/event-stream', function () {

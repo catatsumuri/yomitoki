@@ -10,7 +10,7 @@ uses(RefreshDatabase::class);
 
 test('job generates and stores embedding for a scrap', function () {
     Embeddings::fake([
-        [Embeddings::fakeEmbedding(1024)],
+        [Embeddings::fakeEmbedding(1536)],
     ]);
 
     $user = User::factory()->create();
@@ -26,7 +26,7 @@ test('job generates and stores embedding for a scrap', function () {
 
     expect($scrap->embedding)->not->toBeNull();
     expect($scrap->embedding_generated_at)->not->toBeNull();
-    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1536);
 });
 
 test('job does nothing when scrap does not exist', function () {
@@ -39,7 +39,7 @@ test('job does nothing when scrap does not exist', function () {
 
 test('job uses summary instead of content when summary is present', function () {
     Embeddings::fake([
-        [Embeddings::fakeEmbedding(1024)],
+        [Embeddings::fakeEmbedding(1536)],
     ]);
 
     $user = User::factory()->create();
@@ -55,12 +55,12 @@ test('job uses summary instead of content when summary is present', function () 
     $scrap->refresh();
 
     expect($scrap->embedding)->not->toBeNull();
-    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1536);
 });
 
 test('job strips code blocks from content when no summary', function () {
     Embeddings::fake([
-        [Embeddings::fakeEmbedding(1024)],
+        [Embeddings::fakeEmbedding(1536)],
     ]);
 
     $user = User::factory()->create();
@@ -76,12 +76,12 @@ test('job strips code blocks from content when no summary', function () {
     $scrap->refresh();
 
     expect($scrap->embedding)->not->toBeNull();
-    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1536);
 });
 
 test('job uses content directly when no summary and no code blocks', function () {
     Embeddings::fake([
-        [Embeddings::fakeEmbedding(1024)],
+        [Embeddings::fakeEmbedding(1536)],
     ]);
 
     $user = User::factory()->create();
@@ -97,7 +97,7 @@ test('job uses content directly when no summary and no code blocks', function ()
     $scrap->refresh();
 
     expect($scrap->embedding)->not->toBeNull();
-    expect(json_decode($scrap->embedding, true))->toHaveCount(1024);
+    expect(json_decode($scrap->embedding, true))->toHaveCount(1536);
 });
 
 test('store scrap dispatches embedding job', function () {

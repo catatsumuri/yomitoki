@@ -5,10 +5,10 @@ use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-test('ai defaults use bedrock where currently available', function () {
-    expect(config('ai.default'))->toBe('bedrock');
-    expect(config('ai.default_for_images'))->toBe('bedrock');
-    expect(config('ai.default_for_embeddings'))->toBe('bedrock');
+test('ai defaults use azure where currently available', function () {
+    expect(config('ai.default'))->toBe('azure');
+    expect(config('ai.default_for_images'))->toBe('azure');
+    expect(config('ai.default_for_embeddings'))->toBe('azure');
 });
 
 test('scrap domain tables are available with expected columns', function () {

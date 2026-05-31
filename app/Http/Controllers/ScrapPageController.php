@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class ScrapsController extends Controller
+class ScrapPageController extends Controller
 {
     /**
      * Show the article list, or the backup history when ?view=backups.

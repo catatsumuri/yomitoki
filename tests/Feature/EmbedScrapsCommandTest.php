@@ -13,7 +13,7 @@ test('dispatches jobs for scraps without embeddings', function () {
 
     $user = User::factory()->create();
     $unembedded = Scrap::factory()->count(3)->for($user)->create(['embedding' => null]);
-    Scrap::factory()->for($user)->create(['embedding' => json_encode(array_fill(0, 1024, 0.1))]);
+    Scrap::factory()->for($user)->create(['embedding' => json_encode(array_fill(0, 1536, 0.1))]);
 
     $this->artisan('scraps:embed')
         ->expectsOutputToContain('Dispatching embedding jobs for 3 scraps')
@@ -31,7 +31,7 @@ test('does nothing when all scraps already have embeddings', function () {
     Queue::fake();
 
     $user = User::factory()->create();
-    Scrap::factory()->for($user)->create(['embedding' => json_encode(array_fill(0, 1024, 0.1))]);
+    Scrap::factory()->for($user)->create(['embedding' => json_encode(array_fill(0, 1536, 0.1))]);
 
     $this->artisan('scraps:embed')
         ->expectsOutputToContain('All scraps already have embeddings')
