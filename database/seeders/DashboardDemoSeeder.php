@@ -290,6 +290,7 @@ class DashboardDemoSeeder extends Seeder
                     'status' => $scrap['status'],
                     'language' => 'ja',
                     'occurred_at' => $scrap['occurred_at'],
+                    'last_activity_at' => $scrap['occurred_at'],
                     'processed_at' => $scrap['status'] === 'raw' ? null : $scrap['occurred_at']->addMinutes(5),
                     'extracted_data' => json_encode($scrap['extracted_data'], JSON_THROW_ON_ERROR),
                     'meta' => json_encode($scrap['meta'] ?? ['seeded' => true], JSON_THROW_ON_ERROR),

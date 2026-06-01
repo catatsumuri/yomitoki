@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateScrapRequest;
 use App\Http\Requests\UploadScrapImageRequest;
 use App\Jobs\GenerateScrapEmbeddingJob;
 use App\Jobs\GenerateScrapSummaryJob;
+use App\Jobs\GenerateScrapTagsJob;
 use App\Jobs\RefineScrapMarkdownJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
@@ -107,9 +108,11 @@ class ScrapController extends Controller
         $summary = blank($validated['summary'] ?? null) ? null : $validated['summary'];
         $tags = collect($validated['tags'] ?? [])->filter()->values()->all();
 
+        $parentId = $validated['parent_id'] ?? null;
+
         $scrap = Scrap::create([
             'user_id' => $request->user()->id,
-            'parent_id' => $validated['parent_id'] ?? null,
+            'parent_id' => $parentId,
             'source_type' => 'note',
             'source_reference' => (string) Str::uuid(),
             'title' => $resolvedTitle,
@@ -119,13 +122,22 @@ class ScrapController extends Controller
             'summary' => $summary,
             'status' => 'raw',
             'occurred_at' => now(),
+            'last_activity_at' => now(),
             'meta' => ['tags' => $tags],
         ]);
+
+        if ($parentId) {
+            Scrap::where('id', $parentId)->update(['last_activity_at' => now()]);
+        }
 
         GenerateScrapEmbeddingJob::dispatch($scrap->id);
 
         if ($summary === null) {
             GenerateScrapSummaryJob::dispatch($scrap->id);
+        }
+
+        if (empty($tags)) {
+            GenerateScrapTagsJob::dispatch($scrap->id);
         }
 
         Inertia::flash('toast', [
@@ -176,16 +188,25 @@ class ScrapController extends Controller
             'content' => $validated['content'],
             'content_markdown' => $validated['content'],
             'summary' => $summary,
+            'last_activity_at' => now(),
             'meta' => [
                 ...($scrap->meta ?? []),
                 'tags' => $tags,
             ],
         ]);
 
+        if ($scrap->parent_id) {
+            Scrap::where('id', $scrap->parent_id)->update(['last_activity_at' => now()]);
+        }
+
         GenerateScrapEmbeddingJob::dispatch($scrap->id);
 
         if ($summary === null) {
             GenerateScrapSummaryJob::dispatch($scrap->id);
+        }
+
+        if (empty($tags)) {
+            GenerateScrapTagsJob::dispatch($scrap->id);
         }
 
         Inertia::flash('toast', [

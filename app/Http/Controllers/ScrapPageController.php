@@ -182,6 +182,7 @@ class ScrapPageController extends Controller
                 'id' => $child->id,
                 'parentId' => $child->parent_id,
                 'title' => $child->title,
+                'content' => $child->content,
                 'sourceType' => $child->source_type,
                 'status' => $child->status,
                 'summary' => $child->summary,

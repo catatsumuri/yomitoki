@@ -19,6 +19,7 @@ import {
     Loader2,
     PencilLine,
     RotateCcw,
+    Trash2,
     Undo2,
     Wand2,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { dashboard } from '@/routes';
+import { show as scrapsShow } from '@/routes/scraps';
 import { show as dashboardShow } from '@/routes/dashboard';
 
 type InboxItem = {
@@ -82,6 +84,7 @@ type InboxItem = {
         id: number;
         parentId: number | null;
         title: string | null;
+        content: string | null;
         sourceType: string;
         status: string;
         summary: string | null;
@@ -190,6 +193,9 @@ export default function Dashboard({
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
     const [showMainMetaFields, setShowMainMetaFields] = useState(false);
     const [showChildMetaFields, setShowChildMetaFields] = useState(false);
+    const [editingChildId, setEditingChildId] = useState<number | null>(null);
+    const [childEditContent, setChildEditContent] = useState('');
+    const [childEditTitle, setChildEditTitle] = useState('');
     const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
     const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
     const [backupDescription, setBackupDescription] = useState('');
@@ -252,15 +258,6 @@ export default function Dashboard({
                 : workspaceIndex(routeQuery(activeTag, status)),
         );
     }
-
-    const sourceLabels: Record<string, string> = {
-        daily_report: __('Daily report'),
-        execution: __('Execution result'),
-        inquiry: __('Inquiry'),
-        meeting_note: __('Meeting note'),
-        plan: __('Plan'),
-        research: __('Research'),
-    };
 
     setLayoutProps({
         breadcrumbs: [
@@ -630,6 +627,14 @@ export default function Dashboard({
               : false;
 
     async function handleSave(): Promise<void> {
+        const isCreatingChild = selectedScrap !== null && !isEditingSelected;
+
+        if (isCreatingChild) {
+            persistScrap();
+
+            return;
+        }
+
         const missingTitle = form.data.title.trim() === '';
         const missingSlug =
             shouldSuggestSlugForCurrentSave && form.data.slug.trim() === '';
@@ -940,9 +945,7 @@ export default function Dashboard({
                                                     : undefined
                                             }
                                             compact
-                                            sourceLabel={
-                                                sourceLabels[item.sourceType]
-                                            }
+                                            childCount={item.children.length}
                                         />
                                     ))}
                                 </div>
@@ -1166,11 +1169,6 @@ export default function Dashboard({
                                 <div className="space-y-6">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="outline">
-                                                {sourceLabels[
-                                                    selectedScrap.sourceType
-                                                ] ?? selectedScrap.sourceType}
-                                            </Badge>
                                             {selectedScrap.tags.map((tag) => (
                                                 <button
                                                     key={tag}
@@ -1216,10 +1214,22 @@ export default function Dashboard({
                                     </div>
 
                                     <div>
-                                        <h2 className="text-xl font-semibold text-foreground">
-                                            {selectedScrap.title ??
-                                                __('Untitled scrap')}
-                                        </h2>
+                                        {selectedScrap.slug ? (
+                                            <Link
+                                                href={scrapsShow(
+                                                    selectedScrap.slug,
+                                                )}
+                                                className="text-xl font-semibold text-foreground underline-offset-4 hover:underline"
+                                            >
+                                                {selectedScrap.title ??
+                                                    __('Untitled scrap')}
+                                            </Link>
+                                        ) : (
+                                            <h2 className="text-xl font-semibold text-foreground">
+                                                {selectedScrap.title ??
+                                                    __('Untitled scrap')}
+                                            </h2>
+                                        )}
                                         {selectedScrap.latestBackup && (
                                             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                                                 <Download className="size-3 shrink-0" />
@@ -1253,6 +1263,188 @@ export default function Dashboard({
                                             content={selectedScrap.content}
                                         />
                                     </div>
+
+                                    {selectedScrap.children.length > 0 && (
+                                        <div className="space-y-3 border-t border-border/70 pt-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <h3 className="text-sm font-medium text-foreground">
+                                                    {__('Child scraps')}
+                                                </h3>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {__(':count linked', {
+                                                        count: selectedScrap
+                                                            .children.length,
+                                                    })}
+                                                </span>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {selectedScrap.children.map(
+                                                    (child) =>
+                                                        editingChildId ===
+                                                        child.id ? (
+                                                            <div
+                                                                key={child.id}
+                                                                className="space-y-2 rounded-2xl border border-border/70 bg-background/60 p-4"
+                                                            >
+                                                                <Input
+                                                                    value={
+                                                                        childEditTitle
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setChildEditTitle(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder={__(
+                                                                        'Title (optional)',
+                                                                    )}
+                                                                    className="text-sm"
+                                                                />
+                                                                <textarea
+                                                                    autoFocus
+                                                                    value={
+                                                                        childEditContent
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setChildEditContent(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    className="min-h-24 w-full rounded-xl border border-input bg-transparent px-3 py-2 font-mono text-sm leading-6 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                                                />
+                                                                <div className="flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            router.patch(
+                                                                                ScrapController.update(
+                                                                                    child.id,
+                                                                                )
+                                                                                    .url,
+                                                                                {
+                                                                                    title:
+                                                                                        childEditTitle ||
+                                                                                        null,
+                                                                                    content:
+                                                                                        childEditContent,
+                                                                                },
+                                                                                {
+                                                                                    preserveScroll: true,
+                                                                                    onSuccess:
+                                                                                        () =>
+                                                                                            setEditingChildId(
+                                                                                                null,
+                                                                                            ),
+                                                                                },
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        {__(
+                                                                            'Save',
+                                                                        )}
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() =>
+                                                                            setEditingChildId(
+                                                                                null,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {__(
+                                                                            'Cancel',
+                                                                        )}
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                key={child.id}
+                                                                className="rounded-2xl border border-border/70 bg-background/60 p-4"
+                                                            >
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        {child.title && (
+                                                                            <p className="mb-2 font-medium text-foreground">
+                                                                                {
+                                                                                    child.title
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                        <div className="text-sm leading-6">
+                                                                            <MarkdownPreview
+                                                                                content={
+                                                                                    child.content ??
+                                                                                    ''
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex shrink-0 gap-1">
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            className="h-7 w-7 text-muted-foreground"
+                                                                            onClick={() => {
+                                                                                setEditingChildId(
+                                                                                    child.id,
+                                                                                );
+                                                                                setChildEditTitle(
+                                                                                    child.title ??
+                                                                                        '',
+                                                                                );
+                                                                                setChildEditContent(
+                                                                                    child.content ??
+                                                                                        '',
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <PencilLine className="size-3.5" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                                            onClick={() => {
+                                                                                router.delete(
+                                                                                    ScrapController.destroy(
+                                                                                        child.id,
+                                                                                    )
+                                                                                        .url,
+                                                                                    {
+                                                                                        preserveScroll: true,
+                                                                                    },
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <Trash2 className="size-3.5" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                                    <span>
+                                                                        <DateDisplay
+                                                                            value={
+                                                                                child.occurredAt
+                                                                            }
+                                                                        />
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="space-y-4 border-t border-border/70 pt-4">
                                         <div>
@@ -1443,70 +1635,7 @@ export default function Dashboard({
                                                 </Button>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div>
-                                                <h3 className="text-sm font-medium text-foreground">
-                                                    {__('Child scraps')}
-                                                </h3>
-                                            </div>
-                                            <span className="text-xs text-muted-foreground">
-                                                {__(':count linked', {
-                                                    count: selectedScrap
-                                                        .children.length,
-                                                })}
-                                            </span>
-                                        </div>
                                     </div>
-
-                                    {selectedScrap.children.length > 0 && (
-                                        <div className="space-y-3">
-                                            <div className="space-y-3">
-                                                {selectedScrap.children.map(
-                                                    (child) => (
-                                                        <div
-                                                            key={child.id}
-                                                            className="rounded-2xl border border-border/70 bg-background/60 p-4"
-                                                        >
-                                                            <div className="flex items-start justify-between gap-2">
-                                                                <div>
-                                                                    <p className="font-medium text-foreground">
-                                                                        {child.title ??
-                                                                            __(
-                                                                                'Untitled scrap',
-                                                                            )}
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                                        {child.summary ??
-                                                                            __(
-                                                                                'No summary yet.',
-                                                                            )}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                                <span>
-                                                                    {sourceLabels[
-                                                                        child
-                                                                            .sourceType
-                                                                    ] ??
-                                                                        child.sourceType}
-                                                                </span>
-                                                                <span>•</span>
-                                                                <span>
-                                                                    <DateDisplay
-                                                                        value={
-                                                                            child.occurredAt
-                                                                        }
-                                                                    />
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
 
                                     <div className="flex items-center justify-end gap-4 border-t border-border/70 pt-4">
                                         {selectedScrapIsArchived ? (
@@ -1581,11 +1710,6 @@ export default function Dashboard({
                                 <>
                                     {selectedScrap && (
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="outline">
-                                                {sourceLabels[
-                                                    selectedScrap.sourceType
-                                                ] ?? selectedScrap.sourceType}
-                                            </Badge>
                                             <span className="text-xs text-muted-foreground">
                                                 <DateDisplay
                                                     value={
@@ -1987,10 +2111,8 @@ export default function Dashboard({
                                                             : undefined
                                                     }
                                                     compact
-                                                    sourceLabel={
-                                                        sourceLabels[
-                                                            item.sourceType
-                                                        ]
+                                                    childCount={
+                                                        item.children.length
                                                     }
                                                 />
                                             ))}

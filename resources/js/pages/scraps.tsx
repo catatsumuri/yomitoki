@@ -23,6 +23,7 @@ import { extractMarkdownHeadings } from '@/lib/markdown-headings';
 import { toneForStatus } from '@/lib/scrap-utils';
 import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import { scraps as scrapsRoute } from '@/routes';
+import { show as dashboardShow } from '@/routes/dashboard';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
 import { compose as documentsCompose } from '@/routes/documents';
 import { show as scrapsShow } from '@/routes/scraps';
@@ -44,6 +45,7 @@ type Scrap = {
     children: {
         id: number;
         title: string | null;
+        content: string | null;
         sourceType: string;
         status: string;
         summary: string | null;
@@ -159,15 +161,6 @@ export default function Articles({
             block: 'start',
         });
     }, [selectedScrap?.id]);
-
-    const sourceLabels: Record<string, string> = {
-        daily_report: __('Daily report'),
-        execution: __('Execution result'),
-        inquiry: __('Inquiry'),
-        meeting_note: __('Meeting note'),
-        plan: __('Plan'),
-        research: __('Research'),
-    };
 
     const statusLabels: Record<string, string> = {
         raw: __('Raw'),
@@ -421,11 +414,6 @@ export default function Articles({
                                                 selectedScrap.status
                                             ] ?? selectedScrap.status}
                                         </Badge>
-                                        <Badge variant="outline">
-                                            {sourceLabels[
-                                                selectedScrap.sourceType
-                                            ] ?? selectedScrap.sourceType}
-                                        </Badge>
                                         <span className="text-xs text-muted-foreground">
                                             <DateDisplay
                                                 value={selectedScrap.occurredAt}
@@ -446,10 +434,22 @@ export default function Articles({
                                         </div>
                                     )}
 
-                                    <h1 className="text-2xl font-bold text-foreground">
-                                        {selectedScrap.title ??
-                                            __('Untitled scrap')}
-                                    </h1>
+                                    {selectedScrap.slug ? (
+                                        <Link
+                                            href={dashboardShow(
+                                                selectedScrap.slug,
+                                            )}
+                                            className="text-2xl font-bold text-foreground underline-offset-4 hover:underline"
+                                        >
+                                            {selectedScrap.title ??
+                                                __('Untitled scrap')}
+                                        </Link>
+                                    ) : (
+                                        <h1 className="text-2xl font-bold text-foreground">
+                                            {selectedScrap.title ??
+                                                __('Untitled scrap')}
+                                        </h1>
+                                    )}
                                 </div>
 
                                 <div className="rounded-2xl border border-border/70 bg-background/70 p-6">
@@ -478,19 +478,22 @@ export default function Articles({
                                                         className="rounded-2xl border border-border/70 bg-background/60 p-4"
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
-                                                            <div>
-                                                                <p className="font-medium text-foreground">
-                                                                    {child.title ??
-                                                                        __(
-                                                                            'Untitled scrap',
-                                                                        )}
-                                                                </p>
-                                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                                                    {child.summary ??
-                                                                        __(
-                                                                            'No summary yet.',
-                                                                        )}
-                                                                </p>
+                                                            <div className="min-w-0 flex-1">
+                                                                {child.title && (
+                                                                    <p className="mb-2 font-medium text-foreground">
+                                                                        {
+                                                                            child.title
+                                                                        }
+                                                                    </p>
+                                                                )}
+                                                                <div className="text-sm leading-6">
+                                                                    <MarkdownPreview
+                                                                        content={
+                                                                            child.content ??
+                                                                            ''
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             </div>
                                                             <Badge
                                                                 variant={toneForStatus(
@@ -504,21 +507,11 @@ export default function Articles({
                                                             </Badge>
                                                         </div>
                                                         <div className="mt-3 flex gap-2 text-xs text-muted-foreground">
-                                                            <span>
-                                                                {sourceLabels[
-                                                                    child
-                                                                        .sourceType
-                                                                ] ??
-                                                                    child.sourceType}
-                                                            </span>
-                                                            <span>•</span>
-                                                            <span>
-                                                                <DateDisplay
-                                                                    value={
-                                                                        child.occurredAt
-                                                                    }
-                                                                />
-                                                            </span>
+                                                            <DateDisplay
+                                                                value={
+                                                                    child.occurredAt
+                                                                }
+                                                            />
                                                         </div>
                                                     </div>
                                                 ),
@@ -796,11 +789,14 @@ export default function Articles({
                                         </Badge>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                        <span className="inline-flex items-center gap-1">
-                                            <span className="size-1.5 rounded-full bg-primary/40" />
-                                            {sourceLabels[item.sourceType] ??
-                                                item.sourceType}
-                                        </span>
+                                        {item.children.length > 0 && (
+                                            <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+                                                <span>↳</span>
+                                                <span>
+                                                    {item.children.length}
+                                                </span>
+                                            </span>
+                                        )}
                                         {item.tags.map((tag) => (
                                             <Badge
                                                 key={tag}
@@ -810,7 +806,7 @@ export default function Articles({
                                                 #{tag}
                                             </Badge>
                                         ))}
-                                        <span>•</span>
+                                        {item.tags.length > 0 && <span>•</span>}
                                         <span>
                                             <DateDisplay
                                                 value={item.occurredAt}

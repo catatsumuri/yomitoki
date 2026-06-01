@@ -29,6 +29,7 @@ return new class extends Migration
             $table->string('status')->default('raw');
             $table->string('language', 12)->nullable();
             $table->timestamp('occurred_at')->nullable();
+            $table->timestamp('last_activity_at')->nullable()->index();
             $table->timestamp('processed_at')->nullable();
             $table->json('extracted_data')->nullable();
             $table->json('meta')->nullable();

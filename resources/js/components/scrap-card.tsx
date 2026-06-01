@@ -21,7 +21,7 @@ type ScrapCardProps = {
     onClick?: () => void;
     href?: NonNullable<InertiaLinkProps['href']>;
     compact?: boolean;
-    sourceLabel?: string;
+    childCount?: number;
 };
 
 export function ScrapCard({
@@ -30,7 +30,7 @@ export function ScrapCard({
     onClick,
     href,
     compact = false,
-    sourceLabel,
+    childCount,
 }: ScrapCardProps) {
     const inner = (
         <div className="relative">
@@ -56,10 +56,12 @@ export function ScrapCard({
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                    <span className="size-1.5 rounded-full bg-primary/40" />
-                    {sourceLabel ?? item.sourceType}
-                </span>
+                {childCount != null && childCount > 0 && (
+                    <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+                        <span>↳</span>
+                        <span>{childCount}</span>
+                    </span>
+                )}
                 {item.tags.map((tag) => (
                     <Badge
                         key={tag}
@@ -71,7 +73,9 @@ export function ScrapCard({
                 ))}
                 {!compact && (
                     <>
-                        <span className="text-border">•</span>
+                        {item.tags.length > 0 && (
+                            <span className="text-border">•</span>
+                        )}
                         <span className="tabular-nums">
                             <DateDisplay value={item.occurredAt} />
                         </span>

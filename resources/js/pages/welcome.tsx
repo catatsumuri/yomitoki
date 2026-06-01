@@ -74,7 +74,7 @@ export default function Welcome({ status }: Props) {
                         {/* Headline */}
                         <div className="max-w-2xl space-y-6">
                             <h1 className="text-5xl leading-[0.9] font-black tracking-tight lg:text-6xl xl:text-7xl">
-                                <span className="block">{__('AI plans,')}</span>
+                                <span className="block">{__('AI,')}</span>
                                 <span className="block text-primary">
                                     {__('record,')}
                                 </span>

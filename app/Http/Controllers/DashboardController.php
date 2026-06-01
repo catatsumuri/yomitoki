@@ -130,7 +130,7 @@ class DashboardController extends Controller
                     ->orderBy('id')]),
             $tag,
         )
-            ->latest('occurred_at')
+            ->orderByRaw('COALESCE(last_activity_at, occurred_at) DESC')
             ->paginate(5, pageName: 'scraps')
             ->through(fn (Scrap $scrap) => $this->mapScrapForDashboard($scrap)));
         $documentQuery = DB::table('documents')->where('user_id', $user->id);
@@ -252,6 +252,7 @@ class DashboardController extends Controller
                 'id' => $child->id,
                 'parentId' => $child->parent_id,
                 'title' => $child->title,
+                'content' => $child->content,
                 'sourceType' => $child->source_type,
                 'status' => $child->status,
                 'summary' => $child->summary,
