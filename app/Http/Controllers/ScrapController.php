@@ -9,7 +9,6 @@ use App\Http\Requests\UpdateScrapRequest;
 use App\Http\Requests\UploadScrapImageRequest;
 use App\Jobs\GenerateScrapEmbeddingJob;
 use App\Jobs\GenerateScrapSummaryJob;
-use App\Jobs\GenerateScrapTagsJob;
 use App\Jobs\RefineScrapMarkdownJob;
 use App\Models\Scrap;
 use Illuminate\Http\JsonResponse;
@@ -136,10 +135,6 @@ class ScrapController extends Controller
             GenerateScrapSummaryJob::dispatch($scrap->id);
         }
 
-        if (empty($tags)) {
-            GenerateScrapTagsJob::dispatch($scrap->id);
-        }
-
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $this->buildSuccessMessage(
@@ -203,10 +198,6 @@ class ScrapController extends Controller
 
         if ($summary === null) {
             GenerateScrapSummaryJob::dispatch($scrap->id);
-        }
-
-        if (empty($tags)) {
-            GenerateScrapTagsJob::dispatch($scrap->id);
         }
 
         Inertia::flash('toast', [

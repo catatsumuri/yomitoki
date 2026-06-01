@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Jobs\GenerateScrapEmbeddingJob;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,9 @@ use Illuminate\Support\Facades\Hash;
 
 class KnowledgeDemoSeeder extends Seeder
 {
+    /** @var array<string, int> */
+    private array $parentScrapIds = [];
+
     public function run(): void
     {
         $now = CarbonImmutable::now();
@@ -44,6 +48,10 @@ class KnowledgeDemoSeeder extends Seeder
             $documentData = $this->seedDocuments($userId, $now);
             $this->seedDocumentScraps($now, $documentData, $scrapIdMap);
         });
+
+        foreach (array_values($this->parentScrapIds) as $id) {
+            GenerateScrapEmbeddingJob::dispatch($id);
+        }
     }
 
     /** @return array<string, int> */
@@ -84,8 +92,9 @@ class KnowledgeDemoSeeder extends Seeder
             // ── 問い合わせ対応ログ ──────────────────────────────────────────
             'inq-01' => [
                 'source' => 'support-inbox', 'source_type' => 'inquiry',
-                'title' => '問い合わせ：ログインができない',
+                'title' => 'ログインができない',
                 'slug' => 'inquiry-cannot-login',
+                'tags' => ['問い合わせ'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(10),
                 'content_markdown' => <<<'MD'
@@ -158,8 +167,9 @@ MD,
 
             'inq-05' => [
                 'source' => 'support-inbox', 'source_type' => 'inquiry',
-                'title' => '問い合わせ：エクスポートCSVがExcelで文字化けする',
+                'title' => 'エクスポートCSVがExcelで文字化けする',
                 'slug' => 'inquiry-csv-garbled',
+                'tags' => ['問い合わせ'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(7),
                 'content_markdown' => <<<'MD'
@@ -197,8 +207,9 @@ MD,
 
             'inq-07' => [
                 'source' => 'support-inbox', 'source_type' => 'inquiry',
-                'title' => '問い合わせ：通知メールが届かない',
+                'title' => '通知メールが届かない',
                 'slug' => 'inquiry-no-notification-email',
+                'tags' => ['問い合わせ'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(5),
                 'content_markdown' => <<<'MD'
@@ -237,8 +248,9 @@ MD,
             // ── バグレポート + 対応記録 ─────────────────────────────────────
             'bug-01' => [
                 'source' => 'bug-tracker', 'source_type' => 'daily_report',
-                'title' => 'バグ：管理画面のユーザー一覧表示が極端に遅い',
+                'title' => '管理画面のユーザー一覧表示が極端に遅い',
                 'slug' => 'bug-admin-user-list-slow',
+                'tags' => ['バグ', 'パフォーマンス'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(8),
                 'content_markdown' => <<<'MD'
@@ -310,8 +322,9 @@ MD,
 
             'bug-05' => [
                 'source' => 'bug-tracker', 'source_type' => 'daily_report',
-                'title' => 'バグ：夜間バッチ処理が途中で停止する',
+                'title' => '夜間バッチ処理が途中で停止する',
                 'slug' => 'bug-nightly-batch-stops',
+                'tags' => ['バグ'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(6),
                 'content_markdown' => <<<'MD'
@@ -364,8 +377,9 @@ MD,
             // ── 技術調査スパイク ──────────────────────────────────────────────
             'res-01' => [
                 'source' => 'tech-notes', 'source_type' => 'research',
-                'title' => '調査：全文検索 vs ベクトル検索の比較',
+                'title' => '全文検索 vs ベクトル検索の比較',
                 'slug' => 'research-fulltext-vs-vector-search',
+                'tags' => ['調査', '検索'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(12),
                 'content_markdown' => <<<'MD'
@@ -441,8 +455,9 @@ MD,
 
             'res-05' => [
                 'source' => 'tech-notes', 'source_type' => 'research',
-                'title' => '調査：Redisキャッシュ戦略の検討',
+                'title' => 'Redisキャッシュ戦略の検討',
                 'slug' => 'research-redis-cache-strategy',
+                'tags' => ['調査'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(9),
                 'content_markdown' => <<<'MD'
@@ -468,8 +483,9 @@ MD,
             // ── 仕様変更の背景メモ ─────────────────────────────────────────────
             'spec-01' => [
                 'source' => 'spec-log', 'source_type' => 'meeting_note',
-                'title' => '仕様変更：APIレート制限の追加',
+                'title' => 'APIレート制限の追加',
                 'slug' => 'spec-api-rate-limiting',
+                'tags' => ['仕様変更'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(11),
                 'content_markdown' => <<<'MD'
@@ -542,8 +558,9 @@ MD,
 
             'spec-05' => [
                 'source' => 'spec-log', 'source_type' => 'meeting_note',
-                'title' => '仕様変更：ユーザー権限モデルをRBACに再設計',
+                'title' => 'ユーザー権限モデルをRBACに再設計',
                 'slug' => 'spec-rbac-redesign',
+                'tags' => ['仕様変更'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(14),
                 'content_markdown' => <<<'MD'
@@ -602,8 +619,9 @@ MD,
             // ── インシデント対応ログ ───────────────────────────────────────────
             'inc-01' => [
                 'source' => 'incident-log', 'source_type' => 'daily_report',
-                'title' => 'インシデント：本番DBのコネクション数が上限に達した',
+                'title' => '本番DBのコネクション数が上限に達した',
                 'slug' => 'incident-db-connection-exhausted',
+                'tags' => ['インシデント'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(4),
                 'content_markdown' => <<<'MD'
@@ -674,8 +692,9 @@ MD,
 
             'inc-05' => [
                 'source' => 'incident-log', 'source_type' => 'daily_report',
-                'title' => 'インシデント：外部決済APIの障害で注文が完了しない',
+                'title' => '外部決済APIの障害で注文が完了しない',
                 'slug' => 'incident-payment-api-outage',
+                'tags' => ['インシデント'],
                 'status' => 'processed',
                 'occurred_at' => $now->subDays(2),
                 'content_markdown' => <<<'MD'
@@ -743,10 +762,14 @@ MD,
                 'last_activity_at' => $scrap['occurred_at'],
                 'processed_at' => $scrap['status'] !== 'raw' ? $scrap['occurred_at']->addMinutes(3) : null,
                 'extracted_data' => null,
-                'meta' => json_encode(['seeded' => true], JSON_THROW_ON_ERROR),
+                'meta' => json_encode(['seeded' => true, 'tags' => $scrap['tags'] ?? []], JSON_THROW_ON_ERROR),
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+
+            if (! isset($scrap['parent'])) {
+                $this->parentScrapIds[$key] = $idMap[$key];
+            }
         }
 
         return $idMap;

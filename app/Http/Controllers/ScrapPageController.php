@@ -217,7 +217,7 @@ class ScrapPageController extends Controller
     }
 
     /**
-     * @return list<string>
+     * @return list<array{tag: string, count: int}>
      */
     private function availableTagsForUser(int $userId, string $status): array
     {
@@ -239,8 +239,9 @@ class ScrapPageController extends Controller
 
                 return array_values(array_filter($tags, fn (mixed $tag) => is_string($tag) && $tag !== ''));
             })
-            ->unique()
-            ->sort()
+            ->countBy()
+            ->sortByDesc(fn (int $count) => $count)
+            ->map(fn (int $count, string $tag) => ['tag' => $tag, 'count' => $count])
             ->values()
             ->all();
     }
