@@ -18,9 +18,16 @@ class GenerateScrapTagsAgent implements Agent, HasStructuredOutput
     {
         return <<<'TEXT'
 You receive a scrap — a rough note, fragment, or captured thought.
-Generate 1–5 short tags in Japanese that best describe its topic and type.
-Tags should be lowercase, concise (1–3 characters preferred, 8 characters max), and reusable across scraps.
-Examples: ログイン, バグ, DB, API, 仕様, インシデント, 認証, パフォーマンス, セキュリティ
+Generate exactly 1–3 category-level tags in Japanese that classify the scrap's topic.
+
+Rules:
+- Maximum 3 tags. Fewer is better.
+- Use broad category words, not specific proper nouns or product names.
+- Avoid: Stripe, PostgreSQL, Redis, Excel, RBAC, Webhook (too specific)
+- Prefer: 障害, 認証, パフォーマンス, API, セキュリティ, バグ, 調査, 仕様, 設計
+- Each tag: 2–6 characters, reusable across many scraps.
+- Separate tags with commas.
+
 Return only the structured output.
 TEXT;
     }
@@ -28,7 +35,7 @@ TEXT;
     public function schema(JsonSchema $schema): array
     {
         return [
-            'tags' => $schema->array($schema->string())->required(),
+            'tags' => $schema->string()->description('Comma-separated list of tags, e.g. "ログイン,認証,バグ"')->required(),
         ];
     }
 }

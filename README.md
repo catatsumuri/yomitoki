@@ -4,436 +4,187 @@ Yomitoki is a Markdown Scrap workspace for AI-assisted development.
 
 It captures plans, execution results, notes, research logs, and other Markdown fragments produced by AI agents or humans, then makes them readable, searchable, and reusable as knowledge artifacts.
 
-The current MVP focuses on a very concrete problem: AI coding agents produce valuable implementation plans, but those plans often disappear into terminal or chat history after approval. Yomitoki stores them as durable Markdown Scraps so the reasoning behind a change can be revisited later.
-
 ## Why It Exists
 
-AI agents do not only write code. They also produce plans.
-
-Those plans usually contain the most important parts of the work:
-
-- what will be built
-- why the approach was chosen
-- what tradeoffs were accepted
-- what scope was intentionally left out
-- what happened after the plan was executed
-
-In a terminal, long plans are hard to review and easy to lose. Tools such as Claude Code Ultraplan point in the same direction: plans are becoming reviewable artifacts, not temporary text.
+AI agents produce plans. Those plans usually contain the most important parts of the work — what will be built, why the approach was chosen, what tradeoffs were accepted, what scope was left out. In a terminal, long plans are hard to review and easy to lose.
 
 Yomitoki takes a tool-agnostic approach. Instead of tightly coupling itself to one agent runtime, it treats Markdown plans and related notes from Claude Code, Codex, GitHub Copilot, or humans as Scraps that can be collected in one place.
 
-## Concept
-
-Yomitoki started as an attempt to build an LLM Wiki-like system with PostgreSQL and a web UI.
-
-The original idea was to collect rough knowledge fragments such as meeting notes, inquiries, research logs, daily reports, and design notes, then use AI to reorganize them into specifications or summary documents.
-
-During development, the most common real source of knowledge turned out to be AI-generated plans and execution results. The product therefore pivoted toward AI-agent development logs, while keeping the broader Scrap model underneath.
-
-In short:
-
-> Yomitoki turns Markdown fragments from AI-assisted work into durable knowledge artifacts.
-
-## Core Model
-
-The central unit is a `Scrap`.
-
-A Scrap can represent:
-
-- an AI-generated implementation plan
-- an execution result
-- a development note
-- a research fragment
-- a meeting note
-- a daily report
-- a Markdown document draft
-
-Scraps can be nested, tagged, summarized, embedded, searched, archived, backed up, and composed into larger documents.
-
 ## Features
 
-- Markdown Scrap capture
-- AI agent plan storage
-- execution results linked as child Scraps
-- Markdown preview with syntax highlighting
-- AI-generated title and slug suggestions
-- AI-generated summaries
-- semantic related Scrap lookup with PostgreSQL and pgvector
-- conversational search over stored Scraps
-- document generation from selected Scraps
-- Scrap archive and restore
-- zip backup for Scraps and referenced images
-- Laravel Fortify authentication and passkeys
-
-## Current Agent Workflow
-
-For the current repository, plans can be saved through the bundled agent skills and Artisan commands.
-
-```text
-AI agent plan
-  -> Markdown file
-  -> plans:save
-  -> scraps table
-  -> Dashboard
-```
-
-Execution results can be attached to an existing plan:
-
-```text
-implementation result
-  -> Markdown file
-  -> plans:result
-  -> child Scrap
-  -> plan detail view
-```
-
-This is intentionally not limited to plans. Plans are just the first high-value Markdown source that became useful in day-to-day development.
+- Markdown Scrap capture with AI-suggested title, slug, and summary
+- AI-generated tags (auto-dispatched on save)
+- pgvector semantic embedding and related Scrap lookup
+- RAG conversational search with tool-based retrieval and source link chips
+- Markdown refinement (plain text → structured Markdown via AI)
+- Document generation from selected Scraps
+- Scrap archive, restore, zip backup
+- External API with Sanctum PAT authentication
+- Agent skill auto-install (`/api/skills/install`)
+- Cross-linking between Dashboard workspace and Articles view
+- Laravel Fortify authentication + passkeys
 
 ## Architecture
 
-```text
+```
 AI Agent / Developer
-  -> Markdown Scrap
-  -> Laravel
-  -> PostgreSQL + pgvector
-  -> Laravel AI
-  -> Azure OpenAI / other supported providers
-  -> Inertia + React UI
+  → Markdown Scrap (web UI or API)
+  → Laravel 13 + PostgreSQL 17 + pgvector
+  → Laravel AI SDK (Azure OpenAI / other providers)
+  → Queue workers: EmbeddingJob, SummaryJob, TagsJob
+  → Inertia v3 + React UI
 ```
-
-Main technologies:
-
-- Laravel
-- Inertia.js
-- React
-- PostgreSQL
-- pgvector
-- Laravel AI SDK
-- Azure OpenAI
-- Tailwind CSS
-- Laravel Sail
-
-The application uses Laravel AI SDK so the AI provider can be swapped at the configuration layer. Development has used provider abstraction heavily; the hackathon deployment is intended to run on Azure infrastructure with Azure OpenAI for AI features.
-
-## Screens and Workflows
-
-### Dashboard
-
-Capture and inspect Scraps. This is the primary workspace for rough notes, plans, and execution results.
-
-### Articles
-
-Read Scraps in a more article-like layout, filter by tag/status, select multiple Scraps, archive them, back them up, or compose a document.
-
-### Documents
-
-View AI-generated documents created from selected Scraps.
-
-### Search
-
-Ask questions over stored Scraps. Relevant Scraps are injected as context for the AI assistant.
-
-## Roadmap
-
-### Phase 1: Local Plan Capture
-
-Capture plans and execution results generated while developing Yomitoki itself.
-
-This phase proves that AI-generated plans are useful knowledge artifacts and gives the app real data from its own development process.
-
-### Phase 2: External Scrap Ingest
-
-Add a minimal HTTP ingest API so external projects and agents can send Markdown Scraps to Yomitoki.
-
-**Implemented.** See [API Reference](#api-reference) below.
-
-This turns Yomitoki from a self-contained plan previewer into a cross-project knowledge hub for AI-assisted work.
-
-### Phase 3: LLM Wiki Behavior
-
-Move beyond storing Scraps toward maintaining higher-level knowledge structures:
-
-- concept pages
-- project-level indexes
-- stale or conflicting Scrap detection
-- automatic relationship discovery
-- continuously updated generated documents
-
-## API Reference
-
-All endpoints require a Sanctum API token with the `ingest` ability.
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-Tokens can be generated from **Settings → API Tokens**.
-
-### GET /api/search
-
-Semantic vector search over stored Scraps. Generates an embedding for the query and returns similar Scraps ranked by cosine similarity.
-
-| Query param | Type | Default | Description |
-|---|---|---|---|
-| `q` | string | required | Search text (max 500 chars) |
-| `limit` | int | 5 | Max results (max 20) |
-| `source_type` | string | — | Filter by source type |
-| `threshold` | float | 0.2 | Minimum similarity score (0–1) |
-| `include` | string | — | Pass `content` to include `content_markdown` in results |
-
-Response `200`:
-
-```json
-{
-  "query": "authentication implementation",
-  "data": [
-    {
-      "id": 42,
-      "slug": "add-user-auth",
-      "title": "Add User Auth",
-      "source_type": "plan",
-      "status": "processed",
-      "summary": "Fortify + passkeys による認証実装",
-      "similarity": 0.87,
-      "occurred_at": "2026-05-30T00:00:00Z",
-      "url": "https://example.com/dashboard/add-user-auth"
-    }
-  ]
-}
-```
-
-Returns `data: []` when pgvector is unavailable or no matching Scraps exist.
-
-### GET /api/scraps/{slug}/related
-
-Returns Scraps semantically similar to the given Scrap using pgvector cosine distance.
-
-| Query param | Type | Default |
-|---|---|---|
-| `limit` | int | 5 (max 20) |
-
-Response `200`:
-
-```json
-{
-  "data": [
-    {
-      "id": 7,
-      "slug": "passkey-setup",
-      "title": "Passkey Setup",
-      "source_type": "plan",
-      "status": "processed",
-      "summary": "...",
-      "similarity": 0.91,
-      "occurred_at": "2026-05-30T00:00:00Z"
-    }
-  ]
-}
-```
-
-Returns `data: []` when the Scrap has no embedding yet.
-
-### GET /api/skills/install
-
-Install Yomitoki agent skills into any project. Run from the project root:
-
-```bash
-curl -H "Authorization: Bearer {token}" \
-  "https://your-yomitoki/api/skills/install?agent=claude_code&profile=full" | bash
-```
-
-| Query param | Values | Default | Description |
-|---|---|---|---|
-| `agent` | `claude_code`, `codex` | `claude_code` | Target agent |
-| `profile` | `basic`, `plan`, `full` | `full` | Skill set to install |
-
-**Profiles:**
-
-| Profile | Skills installed | Use case |
-|---|---|---|
-| `basic` | `scrap-utils` | Push any Markdown to Yomitoki (CI logs, notes, docs) |
-| `plan` | `plan-to-markdown`, `execution-result` | AI agent development log workflow |
-| `full` | All of the above | Both use cases |
-
-The returned script:
-1. Saves `YOMITOKI_URL` and `YOMITOKI_TOKEN` to `~/.config/yomitoki/config`
-2. Creates skill directories (`.claude/skills/` or `.agents/skills/`) in the current directory
-3. Installs the selected skills
-
-**Requirements:** `curl`, `jq`
-
-### POST /api/scraps
-
-Create a new Scrap.
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `title` | string | yes | Scrap title |
-| `content_markdown` | string | yes | Markdown body |
-| `source_type` | string | no | `plan` (default), `note`, `result`, `research`, `meeting`, `execution` |
-| `project` | string | no | Project name, added as a tag |
-| `directory` | string | no | Source directory path |
-| `slug` | string | no | Custom slug (`[a-z0-9-]`, max 80 chars). Auto-generated if omitted. Suffixed with `-2`, `-3`… on conflict. |
-| `parent_slug` | string | no | Slug of the parent Scrap. Creates a child relationship (e.g. execution result → plan). |
-| `description` | string | no | Short summary saved directly to `summary`. Skips AI summarization. |
-| `meta` | object | no | Arbitrary key/value metadata |
-
-```json
-{
-  "title": "External project implementation plan",
-  "source_type": "plan",
-  "project": "sample-app",
-  "content_markdown": "# Plan\n\nMarkdown from another project."
-}
-```
-
-Response `201`:
-
-```json
-{
-  "id": 42,
-  "slug": "external-project-implementation-plan",
-  "url": "https://example.com/dashboard/external-project-implementation-plan"
-}
-```
-
-### GET /api/scraps
-
-List Scraps for the authenticated user.
-
-| Query param | Description |
-|---|---|
-| `source_type` | Filter by source type |
-| `status` | Filter by status (`raw`, `processed`, `archived`) |
-| `limit` | Page size, max 100 (default 20) |
-
-Response `200`:
-
-```json
-{
-  "data": [
-    {
-      "id": 42,
-      "slug": "my-plan",
-      "title": "My Plan",
-      "source_type": "plan",
-      "status": "processed",
-      "created_at": "2026-05-30T00:00:00Z"
-    }
-  ],
-  "meta": {
-    "total": 1,
-    "per_page": 20,
-    "current_page": 1
-  }
-}
-```
-
-### GET /api/scraps/{slug}
-
-Get a single Scrap with its children.
-
-Response `200`:
-
-```json
-{
-  "id": 42,
-  "slug": "my-plan",
-  "title": "My Plan",
-  "source_type": "plan",
-  "status": "processed",
-  "summary": "AI-generated summary.",
-  "content_markdown": "# Plan\n\n...",
-  "occurred_at": "2026-05-30T00:00:00Z",
-  "created_at": "2026-05-30T00:00:00Z",
-  "updated_at": "2026-05-30T00:00:00Z",
-  "children": []
-}
-```
-
-### PATCH /api/scraps/{slug}
-
-Update an existing Scrap. All fields are optional.
-
-| Field | Type | Description |
-|---|---|---|
-| `title` | string | New title |
-| `slug` | string | New slug (`[a-z0-9-]`, max 80 chars) |
-| `content_markdown` | string | New Markdown body. Triggers re-embedding and re-summarization. |
-| `status` | string | `raw`, `processed`, or `archived` |
-| `source_type` | string | `plan`, `note`, `result`, `research`, `meeting`, or `execution` |
-| `summary` | string\|null | Override AI summary |
-
-Response `200`: updated Scrap object (same shape as GET show, without `children`).
-
-### DELETE /api/scraps/{slug}
-
-Delete a Scrap and all its descendants.
-
-Response `204`: no content.
 
 ## Setup
 
 ```bash
 cp .env.example .env
 vendor/bin/sail up -d
-vendor/bin/sail artisan migrate
-vendor/bin/sail artisan db:seed
+vendor/bin/sail artisan migrate:fresh --seed
 vendor/bin/sail npm run build
 ```
 
-Run the application locally:
+Local development:
 
 ```bash
 vendor/bin/sail up -d
 vendor/bin/sail npm run dev
+vendor/bin/sail artisan queue:work   # process embedding/summary/tags jobs
 ```
 
-Run tests:
+Tests:
 
 ```bash
 vendor/bin/sail artisan test --compact
 ```
 
-### PDF Export Font Handling
+## Demo Data
 
-Document PDF export (Dompdf) uses a Japanese font file and runtime-generated font cache files.
+Two seeders are available:
 
-- Commit only source font files that are actually required (currently `resources/fonts/ipag.ttf`).
-- Do not commit generated files under `storage/fonts` (metrics/cache). They are generated at runtime.
-- If you need a different font in your environment, place the TTF file under `resources/fonts` and update the PDF view/controller font settings accordingly.
+| Seeder | User | Description |
+|--------|------|-------------|
+| `DashboardDemoSeeder` | test@example.com / password | Spec-generation workflow demo |
+| `KnowledgeDemoSeeder` | demo@example.com / password | 34 realistic scraps across 5 scenarios (inquiries, bugs, research, spec changes, incidents) |
 
-## Saving a Plan Manually
-
-Save a Markdown plan file as a Scrap:
+Run after `migrate:fresh`:
 
 ```bash
-vendor/bin/sail artisan plans:save \
-  --title="External Scrap Ingest API" \
-  --slug="external-scrap-ingest-api" \
-  --file="plans/2026-05-28-external-scrap-ingest-api.md" \
-  --project="yomitoki"
+vendor/bin/sail artisan db:seed --class KnowledgeDemoSeeder
+vendor/bin/sail artisan scraps:embed --user=demo@example.com --tags
 ```
 
-Attach an execution result to a saved plan:
+## Artisan Commands
+
+### Plan / Execution result
 
 ```bash
+# Save a Markdown plan file as a Scrap
+vendor/bin/sail artisan plans:save \
+  --title="My Plan" \
+  --slug="my-plan" \
+  --file="plan.md" \
+  --project="my-project"
+
+# Attach an execution result as a child Scrap to an existing plan
 vendor/bin/sail artisan plans:result \
-  --plan="external-scrap-ingest-api" \
+  --plan="my-plan" \
   --file="result.md" \
   --title="Execution result"
 ```
 
-## Hackathon Positioning
+### Scrap management
 
-Yomitoki is being developed for Microsoft Agent Hackathon powered by Tokyo Electron Device.
+```bash
+# List scraps
+vendor/bin/sail artisan scraps:list
+vendor/bin/sail artisan scraps:list --source-type=plan --status=processed
 
-The submission angle is:
+# Add a scrap
+vendor/bin/sail artisan scraps:add --title="Note" --file="note.md"
 
-> Yomitoki collects Markdown-based work fragments produced by AI agents and developers, then uses Azure OpenAI to summarize, search, and compose them into reusable business knowledge.
+# Update a scrap by slug
+vendor/bin/sail artisan scraps:update my-slug --title="New Title"
 
-The first practical use case is AI-agent implementation plans. The broader direction is a tool-agnostic Markdown Scrap knowledge base for agentic work.
+# Delete a scrap and its children
+vendor/bin/sail artisan scraps:delete my-slug
+
+# Backup scraps to zip
+vendor/bin/sail artisan scraps:backup
+vendor/bin/sail artisan scraps:backup --slug=my-slug
+```
+
+### Embedding and tags
+
+```bash
+# Dispatch embedding jobs for all scraps missing embeddings
+vendor/bin/sail artisan scraps:embed
+
+# Scope to a specific user (ID or email)
+vendor/bin/sail artisan scraps:embed --user=demo@example.com
+
+# Also dispatch tag generation jobs
+vendor/bin/sail artisan scraps:embed --user=demo@example.com --tags
+
+# Force re-dispatch even if embedding already exists
+vendor/bin/sail artisan scraps:embed --force --tags
+```
+
+## API Reference
+
+All endpoints require `Authorization: Bearer {token}` with the `ingest` ability.
+Tokens can be generated from **Settings → API Tokens**.
+
+### Agent skill install
+
+```bash
+curl -H "Authorization: Bearer {token}" \
+  "https://your-yomitoki/api/skills/install?profile=full" | bash
+```
+
+| `profile` | Skills | Use case |
+|-----------|--------|----------|
+| `basic` | `scrap-utils` | Push any Markdown (CI logs, notes, docs) |
+| `plan` | `plan-to-markdown`, `execution-result` | AI agent development log |
+| `full` | All of the above | Everything |
+
+### POST /api/scraps
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | required |
+| `content_markdown` | string | required |
+| `source_type` | string | `plan` (default), `note`, `result`, `research`, `meeting`, `execution` |
+| `project` | string | Added as a tag |
+| `slug` | string | Auto-generated if omitted |
+| `parent_slug` | string | Creates a child relationship |
+| `description` | string | Saved directly as summary, skips AI summarization |
+
+Response `201`: `{ id, slug, url }`
+
+### GET /api/scraps
+
+List scraps. Query params: `source_type`, `status`, `limit` (max 100).
+
+### GET /api/scraps/{slug}
+
+Get a single Scrap with children.
+
+### PATCH /api/scraps/{slug}
+
+Update title, slug, content_markdown, status, source_type, or summary.
+
+### DELETE /api/scraps/{slug}
+
+Delete a Scrap and all descendants. Response `204`.
+
+### GET /api/scraps/{slug}/related
+
+Semantically similar Scraps via pgvector. Query param: `limit` (max 20).
+
+### GET /api/search
+
+Semantic vector search. Query params: `q` (required), `limit`, `threshold` (default 0.2), `include=content`.
 
 ## License
 

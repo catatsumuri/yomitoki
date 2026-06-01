@@ -27,7 +27,6 @@ import { useEffect, useRef, useState } from 'react';
 import BackupController from '@/actions/App/Http/Controllers/BackupController';
 import ScrapController from '@/actions/App/Http/Controllers/ScrapController';
 import { show as scrapRevisionsShow } from '@/actions/App/Http/Controllers/ScrapRevisionsController';
-import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import InputError from '@/components/input-error';
 import { MarkdownPreview } from '@/components/markdown-preview';
 import { ScrapCard } from '@/components/scrap-card';
@@ -60,9 +59,10 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import { dashboard } from '@/routes';
-import { show as scrapsShow } from '@/routes/scraps';
 import { show as dashboardShow } from '@/routes/dashboard';
+import { show as scrapsShow } from '@/routes/scraps';
 
 type InboxItem = {
     id: number;
@@ -109,7 +109,7 @@ type DashboardProps = {
     };
     selectedScrap: InboxItem | null;
     relatedScraps: RelatedScrap[];
-    availableTags: string[];
+    availableTags: { tag: string; count: number }[];
     activeTag: string | null;
     activeStatus: 'active' | 'archived';
 };
@@ -990,7 +990,7 @@ export default function Dashboard({
                             >
                                 {__('All tags')}
                             </Button>
-                            {availableTags.map((tag) => (
+                            {availableTags.map(({ tag, count }) => (
                                 <Button
                                     key={tag}
                                     size="sm"
@@ -1002,6 +1002,9 @@ export default function Dashboard({
                                     onClick={() => visitTag(tag)}
                                 >
                                     #{tag}
+                                    <span className="ml-1 opacity-60">
+                                        {count}
+                                    </span>
                                 </Button>
                             ))}
                         </div>

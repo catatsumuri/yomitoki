@@ -22,7 +22,12 @@ class GenerateScrapTagsJob implements ShouldQueue
         }
 
         $data = GenerateScrapTagsAgent::make()->prompt($scrap->content)->toArray();
-        $tags = collect($data['tags'] ?? [])->filter()->unique()->values()->all();
+        $tags = collect(explode(',', $data['tags'] ?? ''))
+            ->map(fn (string $t) => trim($t))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         $scrap->update([
             'meta' => [

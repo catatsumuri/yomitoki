@@ -4,6 +4,7 @@ use App\Models\Scrap;
 use App\Models\User;
 use Database\Seeders\DashboardDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
@@ -31,7 +32,14 @@ test('authenticated users can visit the dashboard', function () {
             ->where('summary.runningAiCount', 1)
             ->where('selectedScrap', null)
             ->where('activeTag', null)
-            ->where('availableTags', ['dev', 'research', 'spec', 'support', 'yomitoki'])
+            ->where('availableTags', function (Collection $availableTags): bool {
+                return count($availableTags) === 5
+                    && $availableTags[0] === ['tag' => 'yomitoki', 'count' => 8]
+                    && $availableTags[1] === ['tag' => 'dev', 'count' => 3]
+                    && collect($availableTags)->contains(['tag' => 'support', 'count' => 2])
+                    && collect($availableTags)->contains(['tag' => 'research', 'count' => 2])
+                    && collect($availableTags)->contains(['tag' => 'spec', 'count' => 1]);
+            })
             ->has('inboxItems.data', 5)
             ->where('inboxItems.data.0.title', '日報: 仕様書ドラフト画面の準備')
             ->has('needsAttention', 3)

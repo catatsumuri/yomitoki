@@ -19,12 +19,12 @@ import { TableOfContents } from '@/components/table-of-contents';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import { extractMarkdownHeadings } from '@/lib/markdown-headings';
 import { toneForStatus } from '@/lib/scrap-utils';
-import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
 import { scraps as scrapsRoute } from '@/routes';
-import { show as dashboardShow } from '@/routes/dashboard';
 import { bulkStream as backupBulkStream } from '@/routes/backup';
+import { show as dashboardShow } from '@/routes/dashboard';
 import { compose as documentsCompose } from '@/routes/documents';
 import { show as scrapsShow } from '@/routes/scraps';
 import {
@@ -83,7 +83,7 @@ type ArticlesProps = {
     view: 'list' | 'backups';
     scraps: { data: Scrap[] };
     selectedScrap: Scrap | null;
-    availableTags: string[];
+    availableTags: { tag: string; count: number }[];
     activeTag: string | null;
     activeStatus: 'active' | 'archived';
     backups: BackupEntry[];
@@ -657,7 +657,7 @@ export default function Articles({
                             >
                                 {__('All tags')}
                             </Button>
-                            {availableTags.map((tag) => (
+                            {availableTags.map(({ tag, count }) => (
                                 <Button
                                     key={tag}
                                     size="sm"
@@ -669,6 +669,9 @@ export default function Articles({
                                     onClick={() => visitTag(tag)}
                                 >
                                     #{tag}
+                                    <span className="ml-1 opacity-60">
+                                        {count}
+                                    </span>
                                 </Button>
                             ))}
                         </div>
